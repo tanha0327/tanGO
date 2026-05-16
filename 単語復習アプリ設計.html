@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>単語復習アプリ</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
+.app { max-width: 520px; margin: 0 auto; padding: 1rem; }
+.screen { display: none; }
+.screen.visible { display: block; }
+.card { background: white; border: 1px solid #e5e5e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+.label { font-size: 12px; color: #888; margin-bottom: 8px; }
+.option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.option-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.opt-btn { padding: 10px 8px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 13px; color: #555; transition: all 0.15s; text-align: center; font-family: inherit; }
+.opt-btn.selected { border-color: #2D7DD2; background: #EBF4FF; color: #1a5ba0; font-weight: 600; }
+.big-btn { width: 100%; padding: 13px; border: none; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.15s; margin-bottom: 8px; font-family: inherit; }
+.btn-primary { background: #2D7DD2; color: white; }
+.btn-primary:hover { background: #2266b3; }
+.btn-secondary { background: white; color: #1a1a1a; border: 1px solid #e0e0da; }
+.btn-secondary:hover { background: #f8f8f4; }
+.btn-friend { background: #7B5EA7; color: white; }
+.btn-friend:hover { background: #5c4280; }
+.btn-correct { background: #2e7d32; color: white; font-size: 20px; font-weight: 700; }
+.btn-correct:hover { background: #1b5e20; }
+.btn-wrong-red { background: #c62828; color: white; font-size: 20px; font-weight: 700; }
+.btn-wrong-red:hover { background: #8e0000; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
+.stat-card { background: white; border: 1px solid #e5e5e0; border-radius: 10px; padding: 1rem; text-align: center; }
+.stat-card.clickable { cursor: pointer; }
+.stat-card.clickable:hover { border-color: #2D7DD2; background: #f0f7ff; }
+.stat-num { font-size: 26px; font-weight: 700; color: #1a1a1a; }
+.stat-num.danger { color: #c62828; }
+.stat-lbl { font-size: 11px; color: #888; margin-top: 3px; }
+.quiz-word { font-size: 28px; font-weight: 700; text-align: center; padding: 1.5rem 1rem 0.5rem; color: #1a1a1a; line-height: 1.3; }
+.quiz-hint { font-size: 13px; color: #888; text-align: center; margin-bottom: 1rem; }
+.text-input { width: 100%; padding: 12px 16px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; background: white; color: #1a1a1a; margin-bottom: 10px; font-family: inherit; outline: none; }
+.text-input:focus { border-color: #2D7DD2; box-shadow: 0 0 0 3px rgba(45,125,210,0.1); }
+.result-box { padding: 14px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; line-height: 1.7; }
+.result-correct { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+.result-wrong { background: #fce4ec; color: #880e4f; border: 1px solid #f48fb1; }
+.result-partial { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
+.progress-wrap { height: 4px; background: #e8e8e4; border-radius: 99px; margin-bottom: 1rem; overflow: hidden; }
+.progress-bar { height: 100%; background: #2D7DD2; border-radius: 99px; transition: width 0.3s; }
+.quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.exit-btn { padding: 6px 12px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 12px; color: #888; font-family: inherit; }
+.exit-btn:hover { background: #fce4ec; color: #c62828; border-color: #f48fb1; }
+.friend-answer-box { background: #f3eeff; border: 2px dashed #b39ddb; border-radius: 10px; padding: 1rem 1.25rem; text-align: center; margin-bottom: 1.25rem; }
+.friend-answer-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.friend-answer-text { font-size: 22px; font-weight: 700; color: #4a235a; line-height: 1.4; }
+.friend-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.friend-btns .big-btn { margin: 0; padding: 18px; }
+.ai-loading { text-align: center; padding: 1rem; color: #888; font-size: 13px; }
+.review-item { padding: 12px; border: 1px solid #e5e5e0; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; background: white; }
+.review-item.danger { border-color: #f48fb1; background: #fff5f7; }
+.review-en { font-weight: 600; font-size: 14px; }
+.review-jp { font-size: 13px; color: #666; margin-top: 2px; }
+.badge-num { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #EBF4FF; color: #1a5ba0; white-space: nowrap; }
+.badge-danger { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #fce4ec; color: #c62828; white-space: nowrap; }
+.miss-rate-bar { height: 4px; border-radius: 99px; margin-top: 5px; background: #eee; overflow: hidden; }
+.miss-rate-fill { height: 100%; border-radius: 99px; background: #e53935; }
+/* スライダー */
+.slider-wrap input[type=range] { width:100%; -webkit-appearance:none; appearance:none; height:6px; border-radius:99px; background:#e0e0da; outline:none; cursor:pointer; }
+.slider-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:#2D7DD2; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
+.slider-wrap input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:#2D7DD2; cursor:pointer; border:none; }
+.slider-val { text-align:center; font-size:22px; font-weight:700; color:#2D7DD2; margin-bottom:4px; }
+.slider-sub { display:flex; justify-content:space-between; font-size:11px; color:#aaa; margin-top:4px; }
+/* モーダル */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:100; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:white; border-radius:16px; padding:1.75rem 1.5rem; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+.modal-title { font-size:18px; font-weight:700; margin-bottom:12px; text-align:center; }
+.modal-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:1rem; }
+.modal-btns .big-btn { margin:0; }
+/* 進捗バー（3色） */
+.prog-bar-outer { height:20px; background:#f0f0ec; border-radius:99px; overflow:hidden; margin:10px 0 8px; display:flex; }
+.prog-bar-learned { height:100%; background:linear-gradient(90deg,#2e7d32,#66bb6a); transition:width 0.6s; }
+.prog-bar-seen    { height:100%; background:linear-gradient(90deg,#f57c00,#ffb74d); transition:width 0.6s; }
+/* nav-row */
+.nav-row { display:flex; gap:8px; }
+.nav-row .big-btn { flex:1; margin:0; }
+</style>
+</head>
+<body>
+
+<!-- 途中退出モーダル -->
+<div class="modal-overlay" id="exit-modal">
+  <div class="modal-box">
+    <div class="modal-title">途中退出しますか？</div>
+    <p style="font-size:14px;color:#555;text-align:center;line-height:1.6;">ここまでの結果を保存します。<br>間違えた単語は復習リストへ追加されます。</p>
+    <div class="modal-btns">
+      <button class="big-btn btn-secondary" onclick="closeExitModal()">続ける</button>
+      <button class="big-btn btn-wrong-red" style="font-size:14px;" onclick="confirmExit()">退出して保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ランダムN問モーダル（通常） -->
+<div class="modal-overlay" id="random-modal">
+  <div class="modal-box">
+    <div class="modal-title">🎲 ランダムN問</div>
+    <div class="slider-val"><span id="random-n-val">50</span>問</div>
+    <div class="slider-wrap" style="margin-bottom:0.5rem;">
+      <input type="range" id="random-n-slider" min="1" max="141" value="50" oninput="document.getElementById('random-n-val').textContent=this.value">
+      <div class="slider-sub"><span>1問</span><span id="random-n-max-lbl">141問</span></div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <div class="label">採点モード</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="rnd-score-manual" onclick="setRndScore('manual')">📋 模範解答</button>
+        <button class="opt-btn" id="rnd-score-ai" onclick="setRndScore('ai')">🤖 AI採点</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">問題の方向</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="rnd-dir-jpen" onclick="setRndDir('jp-en')">日本語 → 英語</button>
+        <button class="opt-btn" id="rnd-dir-enjp" onclick="setRndDir('en-jp')">英語 → 日本語</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="big-btn btn-secondary" onclick="closeRandomModal()">キャンセル</button>
+      <button class="big-btn btn-primary" onclick="startRandomN()">開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 友達モードモーダル -->
+<div class="modal-overlay" id="friend-modal">
+  <div class="modal-box">
+    <div class="modal-title">👫 友達モード</div>
+    <div class="slider-val"><span id="friend-n-val">50</span>問</div>
+    <div class="slider-wrap" style="margin-bottom:0.5rem;">
+      <input type="range" id="friend-n-slider" min="1" max="141" value="50" oninput="document.getElementById('friend-n-val').textContent=this.value">
+      <div class="slider-sub"><span>1問</span><span id="friend-n-max-lbl">141問</span></div>
+    </div>
+    <div class="card" style="margin-top:1rem;">
+      <div class="label">問題の方向</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="friend-dir-jpen" onclick="setFriendDir('jp-en')">日本語 → 英語</button>
+        <button class="opt-btn" id="friend-dir-enjp" onclick="setFriendDir('en-jp')">英語 → 日本語</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="big-btn btn-secondary" onclick="closeFriendModal()">キャンセル</button>
+      <button class="big-btn btn-friend" onclick="startFriendMode()">開始</button>
+    </div>
+  </div>
+</div>
+
+<!-- 復習モーダル -->
+<div class="modal-overlay" id="review-modal">
+  <div class="modal-box" style="max-width:420px;max-height:88vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div class="modal-title" style="margin:0;">🔄 復習リスト</div>
+      <button onclick="closeReviewModal()" style="border:none;background:none;font-size:24px;cursor:pointer;color:#aaa;line-height:1;">×</button>
+    </div>
+    <div class="card">
+      <div class="label">採点モード（復習時）</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="review-score-manual" onclick="setReviewScoreMode('manual')">📋 模範解答</button>
+        <button class="opt-btn" id="review-score-ai" onclick="setReviewScoreMode('ai')">🤖 AI採点</button>
+      </div>
+    </div>
+    <button class="big-btn btn-primary" onclick="startReviewQuiz()">復習開始 →</button>
+    <button class="big-btn btn-secondary" id="btn-weak-review" style="display:none;background:#fff8e1;border-color:#ffcc80;color:#e65100;" onclick="startWeakFromReview()">⚠️ 間違えやすい問題集</button>
+    <div style="font-size:11px;color:#aaa;margin-bottom:10px;">⚠️ 正解率70%未満を上位表示 ／ 正解 → 覚えた単語へ・リストから削除</div>
+    <div id="review-list-modal"></div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ══ HOME ══════════════════════════════════════════ -->
+  <div class="screen visible" id="screen-home">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">覚えた単語</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-sessions">0</div><div class="stat-lbl">セッション数</div></div>
+      <div class="stat-card clickable" onclick="openReviewModal()" title="タップして復習">
+        <div class="stat-num" id="stat-review-count">0</div>
+        <div class="stat-lbl">復習待ち 👆</div>
+      </div>
+    </div>
+
+    <!-- 進捗グラフ（3色） -->
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+        <span style="font-size:13px;font-weight:600;">全単語の習得進捗</span>
+        <span style="font-size:12px;color:#888;" id="progress-label">0 / 141語</span>
+      </div>
+      <div class="prog-bar-outer">
+        <div class="prog-bar-learned" id="prog-learned" style="width:0%"></div>
+        <div class="prog-bar-seen"    id="prog-seen"    style="width:0%"></div>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:#555;display:flex;align-items:center;gap:4px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2e7d32;"></span>
+            覚えた <strong id="leg-learned" style="color:#2e7d32;">0</strong>
+          </span>
+          <span style="font-size:12px;color:#555;display:flex;align-items:center;gap:4px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f57c00;"></span>
+            学習中 <strong id="leg-seen" style="color:#f57c00;">0</strong>
+          </span>
+          <span style="font-size:12px;color:#555;display:flex;align-items:center;gap:4px;">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e0e0da;"></span>
+            未学習 <strong id="leg-unseen" style="color:#888;">141</strong>
+          </span>
+        </div>
+        <span style="font-size:13px;font-weight:700;color:#2D7DD2;" id="progress-pct">0.0%</span>
+      </div>
+    </div>
+
+    <button class="big-btn btn-primary" onclick="showScreen('screen-setup')">▶ 通常モードで学習</button>
+    <button class="big-btn btn-secondary" onclick="openRandomModal()">🎲 ランダムN問</button>
+    <button class="big-btn btn-friend" onclick="openFriendModal()">👫 友達モード</button>
+    <button class="big-btn btn-secondary" id="btn-weak-home" style="display:none;background:#fff8e1;border-color:#ffcc80;color:#e65100;" onclick="startWeakWords()">⚠️ 間違えやすい問題集</button>
+  </div>
+
+  <!-- ══ SETUP（通常） ══════════════════════════════════ -->
+  <div class="screen" id="screen-setup">
+    <div class="card">
+      <div class="label">出題範囲</div>
+      <div style="font-size:13px;font-weight:600;text-align:center;color:#1a1a1a;margin-bottom:10px;">
+        No.<span id="range-from-lbl">1401</span> 〜 No.<span id="range-to-lbl">1541</span>
+        <span style="font-size:12px;font-weight:400;color:#888;margin-left:6px;">(<span id="range-count-lbl">141</span>語)</span>
+      </div>
+      <div class="slider-wrap" style="margin-bottom:10px;">
+        <div style="font-size:11px;color:#aaa;margin-bottom:2px;">開始</div>
+        <input type="range" id="range-from" min="0" max="140" value="0" oninput="updateRangeSliders()">
+        <div class="slider-sub"><span>No.1401</span><span>No.1541</span></div>
+      </div>
+      <div class="slider-wrap">
+        <div style="font-size:11px;color:#aaa;margin-bottom:2px;">終了</div>
+        <input type="range" id="range-to" min="0" max="140" value="140" oninput="updateRangeSliders()">
+        <div class="slider-sub"><span>No.1401</span><span>No.1541</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">問題の方向</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="dir-jpen" onclick="setDir('jp-en')">日本語 → 英語</button>
+        <button class="opt-btn" id="dir-enjp" onclick="setDir('en-jp')">英語 → 日本語</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">出題順</div>
+      <div class="option-grid-3">
+        <button class="opt-btn selected" id="order-asc" onclick="setOrder('asc')">昇順</button>
+        <button class="opt-btn" id="order-desc" onclick="setOrder('desc')">降順</button>
+        <button class="opt-btn" id="order-rand" onclick="setOrder('random')">ランダム</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">採点モード</div>
+      <div class="option-grid">
+        <button class="opt-btn selected" id="score-manual" onclick="setScoreMode('manual')">📋 模範解答</button>
+        <button class="opt-btn" id="score-ai" onclick="setScoreMode('ai')">🤖 AI採点</button>
+      </div>
+    </div>
+    <button class="big-btn btn-primary" onclick="startStudy()">▶ 学習開始</button>
+    <button class="big-btn btn-secondary" onclick="showScreen('screen-home')">← 戻る</button>
+  </div>
+
+  <!-- ══ QUIZ（通常） ════════════════════════════════════ -->
+  <div class="screen" id="screen-quiz">
+    <div class="quiz-header">
+      <span id="quiz-counter" style="font-size:13px;color:#888;"></span>
+      <button class="exit-btn" onclick="openExitModal()">✕ 途中退出</button>
+      <span id="quiz-mode-badge" style="font-size:12px;padding:3px 10px;border-radius:99px;background:#EBF4FF;color:#1a5ba0;"></span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="quiz-progress" style="width:0%"></div></div>
+    <div class="card">
+      <div id="quiz-word" class="quiz-word"></div>
+      <div id="quiz-hint" class="quiz-hint"></div>
+      <input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力（空欄も可）..." onkeydown="if(event.key==='Enter'&&!resultShowing)submitAnswer()">
+      <div id="quiz-result" style="display:none;"></div>
+      <div id="ai-loading" class="ai-loading" style="display:none;">🤖 AI採点中...</div>
+    </div>
+    <div class="nav-row">
+      <button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()" style="margin:0;">解答する</button>
+      <button class="big-btn btn-secondary" id="btn-next" onclick="nextQuestion()" style="display:none;margin:0;">次へ →</button>
+    </div>
+  </div>
+
+  <!-- ══ QUIZ（友達） ════════════════════════════════════ -->
+  <div class="screen" id="screen-friend">
+    <div class="quiz-header">
+      <span id="friend-counter" style="font-size:13px;color:#888;"></span>
+      <button class="exit-btn" onclick="openExitModal()">✕ 途中退出</button>
+      <span style="font-size:12px;padding:3px 10px;border-radius:99px;background:#ede7f6;color:#4a235a;">👫 友達モード</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="friend-progress" style="width:0%"></div></div>
+    <div class="card">
+      <div id="friend-word" class="quiz-word"></div>
+      <div id="friend-hint" class="quiz-hint"></div>
+      <div class="friend-answer-box">
+        <div class="friend-answer-label">答え</div>
+        <div class="friend-answer-text" id="friend-answer-text"></div>
+      </div>
+      <div class="friend-btns">
+        <button class="big-btn btn-correct" onclick="friendGrade('correct')">⭕ 正解</button>
+        <button class="big-btn btn-wrong-red" onclick="friendGrade('wrong')">❌ 不正解</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESULT ═════════════════════════════════════════ -->
+  <div class="screen" id="screen-result">
+    <div class="card" style="text-align:center;padding:2rem;">
+      <div style="font-size:40px;margin-bottom:8px;" id="result-emoji"></div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px;" id="result-title"></div>
+      <div style="font-size:14px;color:#888;" id="result-sub"></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" id="res-correct" style="color:#2e7d32;"></div><div class="stat-lbl">正解</div></div>
+      <div class="stat-card"><div class="stat-num" id="res-partial" style="color:#e65100;"></div><div class="stat-lbl">部分正解</div></div>
+      <div class="stat-card"><div class="stat-num" id="res-wrong" style="color:#c62828;"></div><div class="stat-lbl">不正解</div></div>
+    </div>
+    <div id="result-wrong-list" style="margin-bottom:1rem;"></div>
+    <button class="big-btn btn-secondary" onclick="showScreen('screen-home');updateStats();">🏠 ホームへ戻る</button>
+  </div>
+
+</div>
+
+<script>
+// ─── データ ──────────────────────────────────────────────
+const RAW = `1401	bake	(パンなど)を焼く，焼ける
+1402	boil	をわかす，ふっとうする，を煮る，煮える
+1403	melt	を溶かす，溶ける
+1404	feed	に食物・えさを与える／(家族など)を養う／えさ
+1405	flavor	風味，味／味わい，趣
+1406	forbid	を禁止する
+1407	prohibit	を禁止する
+1408	ban	を禁止する／禁止令
+1409	tool	道具
+1410	equipment	装備，設備，道具／知識，技術
+1411	instrument	器具，計器／楽器
+1412	switch	スイッチ／《+ on/offで》スイッチを入れる／切る／を交換する
+1413	furniture	《集合的に》家具
+1414	screen	(テレビやパソコンなどの)画面，(映画などの)スクリーン，ついたて
+1415	cell phone	携帯電話
+1416	beg	(を)請う，(を)頼む
+1417	remind	に思い出させる，に気づかせる
+1418	encourage	を励ます，を奨励する
+1419	relieve	を安心させる／を和らげる
+1420	fascinate	を魅了する，を魅惑する
+1421	force	に無理やり～させる／力／《通常(複)で》軍隊
+1422	confuse	を混乱させる，をまごつかせる／を混同する
+1423	competition	競争，試合
+1424	battle	戦闘，戦争／戦う
+1425	army	《the -》陸軍，軍隊
+1426	soldier	兵士
+1427	victory	勝利
+1428	victim	(事故などの)犠牲者，被害者
+1429	defeat	敗北，敗戦／を打ち負かす
+1430	tank	水槽，タンク／戦車
+1431	figure	(人・物の)姿／数字／図形／と思う／を計算する
+1432	square	正方形，四角／(四角い)広場／《数学で》平方，二乗／正方形の／平方の
+1433	circle	円／仲間，団体
+1434	level	水平な，平らな／水平(面)／水準
+1435	sheet	(紙などの)枚／《通常(複)で》シーツ
+1436	row	列，並び／(ボート)をこぐ
+1437	flow	流れる／流れ
+1438	float	浮かぶ，を浮かべる
+1439	pour	(液体)を注ぐ，流れ出る
+1440	splash	(水など)をはねかける，(水などが)飛び散る
+1441	expect	を予期する／を期待する／(～だろう)と思う
+1442	concern	を心配させる／に関係する／心配，関心事
+1443	hesitate	ためらう，ちゅうちょする
+1444	disappoint	を失望させる
+1445	regret	を後悔する
+1446	doubt	を疑う，～ではないだろうと思う／疑い
+1447	admire	に感心する，を賞賛する
+1448	pray	(を)祈る
+1449	rely	《+ on[upon]…》…をあてにする，…に頼る
+1450	resist	に抵抗する，をがまんする
+1451	refuse	(を)拒む，(を)断る
+1452	avoid	を避ける
+1453	particular	特定の，特別の／《be – about…で》…について(好みが)うるさい
+1454	participate	参加する
+1455	apartment	アパート(の室)／アパート(の建物全体)
+1456	department	(会社などの)部，学部，(デパートなどの)売場
+1457	consist	《+ of…》…から成る，…で構成される
+1458	remain	～のままである／残っている／《(複)で》残り，残ったもの
+1459	require	を必要とする／を要求する
+1460	adopt	を採用する／を養子にする
+1461	select	を選ぶ
+1462	limit	を限定する，を制限する／限界，制限／境界(線)
+1463	unite	を結合させる，結合する，を団結させる，団結する
+1464	connect	を接続する，をつなぐ
+1465	politics	政治，政治学
+1466	democracy	民主主義，民主政治
+1467	freedom	自由
+1468	election	選挙
+1469	official	公の，公式の／公務員，役人，職員
+1470	moral	道徳の，道徳的な／《(複)で》道徳
+1471	investigation	調査，捜査
+1472	data	資料，データ，情報
+1473	aspect	面，様相
+1474	factor	要因，要素
+1475	analyze	を分析する
+1476	focus	《+ on…》…に焦点を合わせる／焦点
+1477	concentrate	《+ (…) on ～》(…を)～に集中する
+1478	effect	影響，効果／結果
+1479	education	教育
+1480	experiment	実験／実験する
+1481	laboratory	研究室・研究所，実験室
+1482	principle	主義／原理，原則
+1483	theory	理論，学説
+1484	scholarship	奨学金
+1485	truly	本当に
+1486	fully	十分に
+1487	slightly	わずかに，少しだけ
+1488	simply	単に／簡単に
+1489	gradually	だんだんと，しだいに
+1490	entire	全体の／完全な
+1491	extreme	極度の／過酷な／過激な／極端(な状態)
+1492	likely	ありそうな
+1493	direction	方向，方角／指揮／《通常(複)で》指示
+1494	period	期間／《the -》時代／授業時間／終止符
+1495	sort	種類／を分類する
+1496	variety	変化(に富むこと)，多様性
+1497	grade	成績《米》／等級，程度／学年／に等級をつける
+1498	rate	率，割合／(サービスなどの)料金，相場
+1499	balance	つり合い，バランス／をつり合わせる，つり合う
+1500	ingredient	成分，要素，内容物／原料，材料
+1501	image	像，イメージ，映像
+1502	impression	印象，感銘
+1503	appearance	見かけ，外観／現れること
+1504	attitude	態度
+1505	possibility	可能性，実現性
+1506	absolutely	完全に，まったく／絶対的に
+1507	adult	成人，おとな／成人の
+1508	kid	子ども／(を)からかう
+1509	ancestor	先祖，祖先
+1510	crowd	群衆／(に)群がる
+1511	owner	所有者，持ち主
+1512	speaker	話す人，話者，演説者／スピーカー
+1513	captain	キャプテン／船長，機長
+1514	author	著者，作者
+1515	director	指導者，重役／(映画などの)監督／指揮者
+1516	immigrant	(外国からの)移民
+1517	talent	才能／才能ある人々
+1518	strict	(人が)厳しい／厳密な
+1519	severe	(人・規律が)厳しい／(天候が)厳しい／(痛みが)ひどい
+1520	cruel	残酷な
+1521	position	位置，場所／地位／立場
+1522	spot	場所，地点／はん点，しみ
+1523	suburb	《the -》郊外／《a -》郊外の一地区
+1524	region	地方，地域／領域／(体などの)部分
+1525	base	土台／基地／の基礎を置く
+1526	locate	(…の)場所・位置を示す／《be -ed in…で》…に位置する
+1527	upstairs	階上へ，2階へ
+1528	downtown	繁華街・商業地区へ(で)／繁華街・商業地区の／(都市の)中心街，商業地区
+1529	frame	骨組み／(窓などの)わく
+1530	edge	ふち，端／(刃物の)刃
+1531	surface	表面／表面の
+1532	section	区域，部分／(新聞などの)欄
+1533	elsewhere	どこかほかのところで
+1534	everywhere	どこでも，いたるところに／どこで…しても
+1535	command	(に)命令する／(言語)を自由にあやつる／命令，(軍の)指揮／(言語を)自由にあやつる力
+1536	obey	(に)従う
+1537	gun	銃
+1538	weapon	武器
+1539	crime	罪，犯罪
+1540	poison	毒，毒薬／を毒する，を害する
+1541	alarm	警報(器)，目覚まし時計／驚き，恐怖／に警報を発する`;
+
+const ALL_WORDS = RAW.trim().split('\n').map(line => {
+  const p = line.split('\t');
+  return { id: parseInt(p[0]), en: p[1].trim(), jp: p[2].trim() };
+});
+
+// ─── 永続化 ──────────────────────────────────────────────
+const LS_KEY = 'vocab_app_v2';
+function loadStorage() {
+  try { const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveStorage() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ wordStats, reviewWords, learnedCount: state.learnedCount, sessions: state.sessions })); } catch {}
+}
+
+// ─── 状態 ────────────────────────────────────────────────
+let wordStats = {};
+let reviewWords = [];
+const state = {
+  direction: 'jp-en', order: 'asc', scoreMode: 'manual',
+  reviewScoreMode: 'manual',
+  rndDir: 'jp-en', rndScore: 'manual',
+  friendDir: 'jp-en',
+  queue: [], current: 0, results: [],
+  isReviewMode: false, isFriendMode: false,
+  learnedCount: 0, sessions: 0
+};
+let resultShowing = false;
+
+(function init() {
+  const saved = loadStorage();
+  if (!saved) return;
+  if (saved.wordStats)   wordStats = saved.wordStats;
+  if (saved.reviewWords) reviewWords = (saved.reviewWords||[]).map(rw => ({ word: ALL_WORDS.find(w=>w.id===rw.word.id)||rw.word, dir: rw.dir }));
+  if (saved.learnedCount) state.learnedCount = saved.learnedCount;
+  if (saved.sessions)     state.sessions = saved.sessions;
+})();
+
+// ─── ユーティリティ ──────────────────────────────────────
+function shuffle(arr) {
+  const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;
+}
+function skey(id,dir){ return `${id}_${dir}`; }
+function recordStat(id,dir,correct){
+  const k=skey(id,dir);
+  if(!wordStats[k]) wordStats[k]={attempts:0,misses:0};
+  wordStats[k].attempts++;
+  if(!correct) wordStats[k].misses++;
+}
+function missRate(id,dir){ const s=wordStats[skey(id,dir)]; return s&&s.attempts>0?s.misses/s.attempts:null; }
+function totalAttempts(w){
+  const jp=wordStats[skey(w.id,'jp-en')]; const en=wordStats[skey(w.id,'en-jp')];
+  return (jp?jp.attempts:0)+(en?en.attempts:0);
+}
+
+// ─── 画面 ────────────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('visible'));
+  document.getElementById(id).classList.add('visible');
+  if(id==='screen-setup') updateRangeSliders();
+}
+
+// ─── モーダル ────────────────────────────────────────────
+function openExitModal(){ document.getElementById('exit-modal').classList.add('open'); }
+function closeExitModal(){ document.getElementById('exit-modal').classList.remove('open'); }
+function confirmExit(){
+  closeExitModal();
+  if(state.results.length===0){ showScreen('screen-home'); updateStats(); return; }
+  finishQuiz(true);
+}
+function openRandomModal(){
+  const max=ALL_WORDS.length;
+  const sl=document.getElementById('random-n-slider');
+  sl.max=max; sl.value=Math.min(parseInt(sl.value)||50,max);
+  document.getElementById('random-n-val').textContent=sl.value;
+  document.getElementById('random-n-max-lbl').textContent=max+'問';
+  document.getElementById('random-modal').classList.add('open');
+}
+function closeRandomModal(){ document.getElementById('random-modal').classList.remove('open'); }
+function openFriendModal(){
+  const max=ALL_WORDS.length;
+  const sl=document.getElementById('friend-n-slider');
+  sl.max=max; sl.value=Math.min(parseInt(sl.value)||50,max);
+  document.getElementById('friend-n-val').textContent=sl.value;
+  document.getElementById('friend-n-max-lbl').textContent=max+'問';
+  document.getElementById('friend-modal').classList.add('open');
+}
+function closeFriendModal(){ document.getElementById('friend-modal').classList.remove('open'); }
+function openReviewModal(){ renderReviewModal(); document.getElementById('review-modal').classList.add('open'); }
+function closeReviewModal(){ document.getElementById('review-modal').classList.remove('open'); }
+
+// ─── 設定 ────────────────────────────────────────────────
+function setDir(d){ state.direction=d; document.getElementById('dir-jpen').classList.toggle('selected',d==='jp-en'); document.getElementById('dir-enjp').classList.toggle('selected',d==='en-jp'); }
+function setOrder(o){ state.order=o; ['asc','desc','random'].forEach(x=>document.getElementById('order-'+x).classList.toggle('selected',x===o)); }
+function setScoreMode(m){ state.scoreMode=m; document.getElementById('score-manual').classList.toggle('selected',m==='manual'); document.getElementById('score-ai').classList.toggle('selected',m==='ai'); }
+function setReviewScoreMode(m){ state.reviewScoreMode=m; document.getElementById('review-score-manual').classList.toggle('selected',m==='manual'); document.getElementById('review-score-ai').classList.toggle('selected',m==='ai'); }
+function setRndDir(d){ state.rndDir=d; document.getElementById('rnd-dir-jpen').classList.toggle('selected',d==='jp-en'); document.getElementById('rnd-dir-enjp').classList.toggle('selected',d==='en-jp'); }
+function setRndScore(m){ state.rndScore=m; document.getElementById('rnd-score-manual').classList.toggle('selected',m==='manual'); document.getElementById('rnd-score-ai').classList.toggle('selected',m==='ai'); }
+function setFriendDir(d){ state.friendDir=d; document.getElementById('friend-dir-jpen').classList.toggle('selected',d==='jp-en'); document.getElementById('friend-dir-enjp').classList.toggle('selected',d==='en-jp'); }
+
+function updateRangeSliders(){
+  const fi=parseInt(document.getElementById('range-from').value);
+  const ti=parseInt(document.getElementById('range-to').value);
+  const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
+  const wf=ALL_WORDS[lo], wt=ALL_WORDS[hi];
+  if(!wf||!wt) return;
+  document.getElementById('range-from-lbl').textContent=wf.id;
+  document.getElementById('range-to-lbl').textContent=wt.id;
+  document.getElementById('range-count-lbl').textContent=hi-lo+1;
+}
+
+// ─── スマートランダム ─────────────────────────────────────
+function getSmartRandomQueue(n, dir){
+  const withCount=ALL_WORDS.map(w=>({word:w,attempts:totalAttempts(w)}));
+  const allDone=withCount.every(x=>x.attempts>0);
+  let pool;
+  if(!allDone){
+    const sorted=[...withCount].sort((a,b)=>a.attempts-b.attempts);
+    const minA=sorted[0].attempts;
+    let candidates=sorted.filter(x=>x.attempts===minA);
+    candidates=shuffle(candidates);
+    if(candidates.length<n){
+      const rest=shuffle(sorted.filter(x=>x.attempts>minA));
+      candidates=[...candidates,...rest];
+    }
+    pool=candidates.slice(0,n);
+  } else {
+    pool=shuffle(ALL_WORDS).slice(0,Math.min(n,ALL_WORDS.length)).map(w=>({word:w}));
+  }
+  return pool.map(x=>({word:x.word||x,dir}));
+}
+
+// ─── 学習開始 ────────────────────────────────────────────
+function startStudy(){
+  const fi=parseInt(document.getElementById('range-from').value);
+  const ti=parseInt(document.getElementById('range-to').value);
+  const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
+  let words=ALL_WORDS.slice(lo,hi+1);
+  if(!words.length){ alert('範囲を確認してください'); return; }
+  if(state.order==='desc') words=[...words].reverse();
+  else if(state.order==='random') words=shuffle(words);
+  state.queue=words.map(w=>({word:w,dir:state.direction}));
+  state.current=0; state.results=[]; state.isReviewMode=false; state.isFriendMode=false;
+  showScreen('screen-quiz'); renderQuestion();
+}
+
+function startRandomN(){
+  closeRandomModal();
+  const n=parseInt(document.getElementById('random-n-slider').value)||50;
+  state.queue=getSmartRandomQueue(n, state.rndDir);
+  state.current=0; state.results=[]; state.isReviewMode=false; state.isFriendMode=false;
+  state.scoreMode=state.rndScore;
+  showScreen('screen-quiz'); renderQuestion();
+}
+
+function startFriendMode(){
+  closeFriendModal();
+  const n=parseInt(document.getElementById('friend-n-slider').value)||50;
+  state.queue=getSmartRandomQueue(n, state.friendDir);
+  state.current=0; state.results=[]; state.isReviewMode=false; state.isFriendMode=true;
+  showScreen('screen-friend'); renderFriendQuestion();
+}
+
+function startReviewQuiz(){
+  closeReviewModal();
+  if(!reviewWords.length){ return; }
+  const sorted=[...reviewWords].sort((a,b)=>(missRate(b.word.id,b.dir)??0)-(missRate(a.word.id,a.dir)??0));
+  state.queue=sorted;
+  state.current=0; state.results=[]; state.isReviewMode=true; state.isFriendMode=false;
+  showScreen('screen-quiz'); renderQuestion();
+}
+
+function startWeakWords(){
+  const weak=[];
+  ALL_WORDS.forEach(w=>{ ['jp-en','en-jp'].forEach(dir=>{ const mr=missRate(w.id,dir); if(mr!==null&&mr>0.3) weak.push({word:w,dir,mr}); }); });
+  if(!weak.length){ alert('正解率70%以下の単語がまだありません'); return; }
+  weak.sort((a,b)=>b.mr-a.mr);
+  state.queue=weak.map(e=>({word:e.word,dir:e.dir}));
+  state.current=0; state.results=[]; state.isReviewMode=false; state.isFriendMode=false;
+  showScreen('screen-quiz'); renderQuestion();
+}
+function startWeakFromReview(){ closeReviewModal(); startWeakWords(); }
+
+// ─── 通常クイズ ──────────────────────────────────────────
+function renderQuestion(){
+  resultShowing=false;
+  const {word:w,dir}=state.queue[state.current];
+  const total=state.queue.length;
+  const mode=state.isReviewMode?state.reviewScoreMode:state.scoreMode;
+  document.getElementById('quiz-counter').textContent=`${state.current+1} / ${total}`;
+  document.getElementById('quiz-mode-badge').textContent=mode==='ai'?'🤖 AI採点':'📋 模範解答';
+  document.getElementById('quiz-progress').style.width=((state.current/total)*100)+'%';
+  document.getElementById('quiz-word').textContent=dir==='jp-en'?w.jp:w.en;
+  document.getElementById('quiz-hint').textContent=dir==='jp-en'?'英語で答えてください':'日本語で答えてください';
+  document.getElementById('quiz-answer').value='';
+  document.getElementById('quiz-answer').disabled=false;
+  document.getElementById('quiz-result').style.display='none';
+  document.getElementById('ai-loading').style.display='none';
+  document.getElementById('btn-submit').style.display='block';
+  document.getElementById('btn-next').style.display='none';
+  setTimeout(()=>document.getElementById('quiz-answer').focus(),50);
+}
+
+async function submitAnswer(){
+  if(resultShowing) return;
+  const userAns=document.getElementById('quiz-answer').value.trim();
+  const {word:w,dir}=state.queue[state.current];
+  const mode=state.isReviewMode?state.reviewScoreMode:state.scoreMode;
+  document.getElementById('quiz-answer').disabled=true;
+  document.getElementById('btn-submit').style.display='none';
+  resultShowing=true;
+  if(mode==='ai'){ document.getElementById('ai-loading').style.display='block'; await gradeAI(w,userAns,dir); }
+  else gradeManual(w,userAns,dir);
+  document.getElementById('btn-next').style.display='block';
+}
+
+function normalize(s){ return s.toLowerCase().replace(/[《》\(\)\s「」『』]/g,'').trim(); }
+
+function gradeManual(w,userAns,dir){
+  const correct=dir==='jp-en'?w.en:w.jp;
+  const answers=correct.split(/[／，,、]/).map(s=>s.replace(/《.*?》/g,'').replace(/\(.*?\)/g,'').trim()).filter(Boolean);
+  const n=normalize(userAns);
+  let grade;
+  if(n===''){ grade='wrong'; }
+  else if(answers.some(a=>normalize(a)===n)) grade='correct';
+  else if(answers.some(a=>{const na=normalize(a);return na.length>=2&&(na.includes(n)||n.includes(na));})) grade='partial';
+  else grade='wrong';
+  state.results.push({word:w,dir,grade,userAns});
+  recordStat(w.id,dir,grade==='correct');
+  showResultBox(grade,correct,userAns,null);
+}
+
+async function gradeAI(w,userAns,dir){
+  const correct=dir==='jp-en'?w.en:w.jp;
+  const question=dir==='jp-en'?w.jp:w.en;
+  try {
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
+        messages:[{role:'user',content:`英単語学習の採点。問題:"${question}" 模範解答:"${correct}" 解答:"${userAns||'（空欄）'}"\n意味・ニュアンスが実質的に合っていれば"correct"（例:bake→「焼く」は正解）、部分的なら"partial"、違うなら"wrong"、空欄は"wrong"。\nJSONのみ返答:{"grade":"correct"|"partial"|"wrong","feedback":"日本語1文"}`}]})
+    });
+    const data=await res.json();
+    document.getElementById('ai-loading').style.display='none';
+    const text=(data.content||[]).map(i=>i.text||'').join('').replace(/```json|```/g,'').trim();
+    let parsed; try{parsed=JSON.parse(text);}catch{parsed={grade:'wrong',feedback:'採点エラー'};}
+    state.results.push({word:w,dir,grade:parsed.grade,userAns});
+    recordStat(w.id,dir,parsed.grade==='correct');
+    showResultBox(parsed.grade,correct,userAns,parsed.feedback);
+  } catch(e){
+    document.getElementById('ai-loading').style.display='none';
+    gradeManual(w,userAns,dir);
+  }
+}
+
+function showResultBox(grade,correct,userAns,feedback){
+  const map={correct:['result-correct','✓ 正解！'],partial:['result-partial','△ 部分正解'],wrong:['result-wrong','✗ 不正解']};
+  const [cls,label]=map[grade]||map.wrong;
+  document.getElementById('quiz-result').innerHTML=`<div class="result-box ${cls}">
+    <strong>${label}</strong>${feedback?`<br><span style="font-size:13px;">${feedback}</span>`:''}
+    <br>模範解答: <strong>${correct}</strong>
+    <br><span style="opacity:0.7;font-size:13px;">あなたの解答: ${userAns||'（空欄）'}</span>
+  </div>`;
+  document.getElementById('quiz-result').style.display='block';
+}
+
+function nextQuestion(){
+  state.current++;
+  if(state.current>=state.queue.length) finishQuiz(false);
+  else renderQuestion();
+}
+
+// ─── 友達クイズ ──────────────────────────────────────────
+function renderFriendQuestion(){
+  const {word:w,dir}=state.queue[state.current];
+  const total=state.queue.length;
+  document.getElementById('friend-counter').textContent=`${state.current+1} / ${total}`;
+  document.getElementById('friend-progress').style.width=((state.current/total)*100)+'%';
+  document.getElementById('friend-word').textContent=dir==='jp-en'?w.jp:w.en;
+  document.getElementById('friend-hint').textContent=dir==='jp-en'?'英語は？':'日本語は？';
+  document.getElementById('friend-answer-text').textContent=dir==='jp-en'?w.en:w.jp;
+}
+function friendGrade(grade){
+  const {word:w,dir}=state.queue[state.current];
+  state.results.push({word:w,dir,grade,userAns:'（手動採点）'});
+  recordStat(w.id,dir,grade==='correct');
+  state.current++;
+  if(state.current>=state.queue.length) finishQuiz(false);
+  else renderFriendQuestion();
+}
+
+// ─── 終了 ────────────────────────────────────────────────
+function finishQuiz(isExit){
+  if(state.results.length===0){ showScreen('screen-home'); updateStats(); return; }
+  state.sessions++;
+  const correct=state.results.filter(r=>r.grade==='correct').length;
+  const partial=state.results.filter(r=>r.grade==='partial').length;
+  const wrong=state.results.filter(r=>r.grade==='wrong').length;
+  state.learnedCount+=correct;
+  if(state.isReviewMode){
+    const ckeys=new Set(state.results.filter(r=>r.grade==='correct').map(r=>skey(r.word.id,r.dir)));
+    reviewWords=reviewWords.filter(rw=>!ckeys.has(skey(rw.word.id,rw.dir)));
+  }
+  state.results.filter(r=>r.grade!=='correct').forEach(r=>{
+    const k=skey(r.word.id,r.dir);
+    if(!reviewWords.find(rw=>skey(rw.word.id,rw.dir)===k)) reviewWords.push({word:r.word,dir:r.dir});
+  });
+  saveStorage(); updateStats();
+  if(isExit){ showScreen('screen-home'); return; }
+  const total=state.results.length;
+  const pct=Math.round((correct/total)*100);
+  document.getElementById('result-emoji').textContent=pct>=80?'🎉':pct>=50?'💪':'📚';
+  document.getElementById('result-title').textContent=pct>=80?'すばらしい！':pct>=50?'もう少し！':'復習しよう';
+  document.getElementById('result-sub').textContent=`${total}問中${correct}問正解 (${pct}%)`;
+  document.getElementById('res-correct').textContent=correct;
+  document.getElementById('res-partial').textContent=partial;
+  document.getElementById('res-wrong').textContent=wrong;
+  const wrongResults=state.results.filter(r=>r.grade!=='correct');
+  document.getElementById('result-wrong-list').innerHTML=wrongResults.length>0
+    ?`<div class="card"><div class="label" style="margin-bottom:8px;">間違えた単語（${wrongResults.length}問）</div>`
+      +wrongResults.map(r=>`<div style="padding:7px 0;border-bottom:1px solid #f0f0ec;font-size:13px;display:flex;justify-content:space-between;">
+        <span><strong>${r.word.en}</strong> <span style="color:#888;">${r.word.jp}</span></span>
+        <span style="font-size:11px;color:#aaa;">${r.dir==='jp-en'?'日→英':'英→日'}</span></div>`).join('')+'</div>'
+    :'';
+  showScreen('screen-result');
+}
+
+// ─── 復習モーダル ─────────────────────────────────────────
+function renderReviewModal(){
+  const hasWeak=ALL_WORDS.some(w=>['jp-en','en-jp'].some(dir=>{const mr=missRate(w.id,dir);return mr!==null&&mr>0.3;}));
+  document.getElementById('btn-weak-review').style.display=hasWeak?'block':'none';
+  const n=reviewWords.length;
+  const el=document.getElementById('review-list-modal');
+  if(!n){
+    el.innerHTML='<div style="text-align:center;padding:2rem;color:#aaa;"><div style="font-size:36px;">✅</div><div style="margin-top:8px;">復習待ちの単語はありません</div></div>';
+    return;
+  }
+  const sorted=[...reviewWords].map((rw,i)=>({rw,i,mr:missRate(rw.word.id,rw.dir)})).sort((a,b)=>(b.mr??-1)-(a.mr??-1));
+  el.innerHTML=sorted.map(({rw,i,mr})=>{
+    const isDanger=mr!==null&&mr>0.3;
+    const s=wordStats[skey(rw.word.id,rw.dir)];
+    const mrText=s?`正解率${Math.round((1-mr)*100)}% (${s.attempts}回)`:'未挑戦';
+    const mrPct=mr!==null?Math.round(mr*100):0;
+    return `<div class="review-item${isDanger?' danger':''}">
+      <div style="flex:1;min-width:0;">
+        <div class="review-en">${rw.word.en}</div>
+        <div class="review-jp">${rw.word.jp}</div>
+        <div style="font-size:11px;color:#aaa;margin-top:3px;">${mrText} ／ ${rw.dir==='jp-en'?'日→英':'英→日'}</div>
+        ${mr!==null?`<div class="miss-rate-bar"><div class="miss-rate-fill" style="width:${mrPct}%"></div></div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;margin-left:8px;flex-shrink:0;">
+        ${isDanger?'<span class="badge-danger">要復習</span>':`<span class="badge-num">No.${rw.word.id}</span>`}
+        <button onclick="removeReview(${i})" style="border:none;background:none;cursor:pointer;font-size:20px;color:#ccc;line-height:1;padding:2px;">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function removeReview(i){ reviewWords.splice(i,1); saveStorage(); updateStats(); renderReviewModal(); }
+
+// ─── 統計・進捗 ──────────────────────────────────────────
+function updateStats(){
+  document.getElementById('stat-total').textContent=state.learnedCount;
+  document.getElementById('stat-sessions').textContent=state.sessions;
+  const n=reviewWords.length;
+  const rcEl=document.getElementById('stat-review-count');
+  rcEl.textContent=n; rcEl.className='stat-num'+(n>0?' danger':'');
+
+  // 間違えやすいボタン（ホーム）
+  const hasWeak=ALL_WORDS.some(w=>['jp-en','en-jp'].some(dir=>{const mr=missRate(w.id,dir);return mr!==null&&mr>0.3;}));
+  const wb=document.getElementById('btn-weak-home');
+  if(wb) wb.style.display=hasWeak?'block':'none';
+
+  // 進捗グラフ（3色）
+  const TOTAL=ALL_WORDS.length;
+  const learned=state.learnedCount;
+  // 「学習中」= 1回以上解いたがまだ「覚えた」判定されていない単語数
+  const seenCount=ALL_WORDS.filter(w=>totalAttempts(w)>0).length;
+  const seen=Math.max(0,seenCount-learned); // 覚えた以外の学習済み
+  const pctL=Math.min(100,(learned/TOTAL)*100);
+  const pctS=Math.min(100-pctL,(seen/TOTAL)*100);
+  document.getElementById('prog-learned').style.width=pctL+'%';
+  document.getElementById('prog-seen').style.width=pctS+'%';
+  document.getElementById('progress-label').textContent=`${learned} / ${TOTAL}語`;
+  document.getElementById('leg-learned').textContent=learned;
+  document.getElementById('leg-seen').textContent=seen;
+  document.getElementById('leg-unseen').textContent=Math.max(0,TOTAL-learned-seen);
+  document.getElementById('progress-pct').textContent=pctL.toFixed(1)+'%';
+}
+
+// 初期化
+updateStats();
+updateRangeSliders();
+</script>
+</body>
+</html>
