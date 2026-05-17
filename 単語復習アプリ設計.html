@@ -6,17 +6,17 @@
 <title>単語復習アプリ</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
-.app { max-width: 520px; margin: 0 auto; padding: 1rem; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
+.app { max-width: 520px; margin: 0 auto; padding: 0.8rem 0.8rem; }
 .screen { display: none; }
 .screen.visible { display: block; }
-.card { background: white; border: 1px solid #e5e5e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-.label { font-size: 12px; color: #888; margin-bottom: 8px; }
+.card { background: white; border: 1px solid #e5e5e0; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
+.label { font-size: 12px; color: #888; margin-bottom: 6px; }
 .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 .option-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
-.opt-btn { padding: 10px 8px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 13px; color: #555; transition: all 0.15s; text-align: center; font-family: inherit; width: 100%; }
+.opt-btn { padding: 8px 6px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 12px; color: #555; transition: all 0.15s; text-align: center; font-family: inherit; width: 100%; }
 .opt-btn.selected { border-color: #2D7DD2; background: #EBF4FF; color: #1a5ba0; font-weight: 600; }
-.big-btn { width: 100%; padding: 13px; border: none; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 500; transition: all 0.15s; margin-bottom: 8px; font-family: inherit; }
+.big-btn { width: 100%; padding: 11px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; margin-bottom: 6px; font-family: inherit; }
 .btn-primary { background: #2D7DD2; color: white; }
 .btn-primary:hover { background: #2266b3; }
 .btn-secondary { background: white; color: #1a1a1a; border: 1px solid #e0e0da; }
@@ -27,11 +27,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .btn-correct:hover { background: #1b5e20; }
 .btn-wrong-red { background: #c62828; color: white; font-size: 20px; font-weight: 700; }
 .btn-wrong-red:hover { background: #8e0000; }
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 1.25rem; }
-.stat-card { background: white; border: 1px solid #e5e5e0; border-radius: 10px; padding: 1rem; text-align: center; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 0.8rem; }
+.stat-card { background: white; border: 1px solid #e5e5e0; border-radius: 10px; padding: 0.75rem; text-align: center; }
 .stat-card.clickable { cursor: pointer; }
 .stat-card.clickable:hover { border-color: #2D7DD2; background: #f0f7ff; }
-.stat-num { font-size: 26px; font-weight: 700; color: #1a1a1a; }
+.stat-num { font-size: 24px; font-weight: 700; color: #1a1a1a; }
 .stat-num.danger { color: #c62828; }
 .stat-lbl { font-size: 11px; color: #888; margin-top: 3px; }
 .quiz-word { font-size: 28px; font-weight: 700; text-align: center; padding: 1.5rem 1rem 0.5rem; color: #1a1a1a; line-height: 1.3; }
@@ -55,12 +55,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .friend-answer-text { font-size: 24px; font-weight: 700; color: #6a1b9a; line-height: 1.4; }
 .friend-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .friend-btns .big-btn { margin: 0; padding: 18px; }
-.review-item { padding: 12px; border: 1px solid #e5e5e0; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; background: white; }
+.review-item { padding: 10px; border: 1px solid #e5e5e0; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; background: white; }
 .review-item.danger { border-color: #f48fb1; background: #fff5f7; }
-.review-en { font-weight: 600; font-size: 14px; }
-.review-jp { font-size: 13px; color: #666; margin-top: 2px; }
-.badge-num { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #EBF4FF; color: #1a5ba0; white-space: nowrap; }
-.badge-danger { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #fce4ec; color: #c62828; white-space: nowrap; }
+.review-en { font-weight: 600; font-size: 13px; }
+.review-jp { font-size: 12px; color: #666; margin-top: 2px; }
+.badge-num { font-size: 10px; padding: 2px 6px; border-radius: 99px; background: #EBF4FF; color: #1a5ba0; white-space: nowrap; }
+.badge-danger { font-size: 10px; padding: 2px 6px; border-radius: 99px; background: #fce4ec; color: #c62828; white-space: nowrap; }
 .miss-rate-bar { height: 4px; border-radius: 99px; margin-top: 5px; background: #eee; overflow: hidden; }
 .miss-rate-fill { height: 100%; border-radius: 99px; background: #e53935; }
 /* スライダー */
@@ -72,26 +72,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* モーダル */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:100; align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
-.modal-box { background:white; border-radius:16px; padding:1.75rem 1.5rem; max-width:360px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
-.modal-title { font-size:18px; font-weight:700; margin-bottom:12px; text-align:center; }
+.modal-box { background:white; border-radius:16px; padding:1.5rem; max-width:360px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.18); max-height:80vh; overflow-y:auto; }
+.modal-title { font-size:17px; font-weight:700; margin-bottom:10px; text-align:center; }
 .modal-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:1rem; }
 .modal-btns .big-btn { margin:0; }
 /* 進捗バー（3色） */
-.prog-bar-outer { height:20px; background:#e0e0da; border-radius:99px; overflow:hidden; margin:10px 0 8px; display:flex; }
+.prog-bar-outer { height:16px; background:#e0e0da; border-radius:99px; overflow:hidden; margin:8px 0 6px; display:flex; }
 .prog-seg-learned  { background: linear-gradient(90deg,#2e7d32,#66bb6a); transition:width 0.6s; }
 .prog-seg-studying { background: linear-gradient(90deg,#f57c00,#ffb74d); transition:width 0.6s; }
 .prog-seg-unknown  { background: transparent; }
-.prog-legend { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
-.prog-legend-item { display:flex; align-items:center; gap:5px; font-size:12px; color:#555; }
-.prog-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.prog-legend { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:2px; }
+.prog-legend-item { display:flex; align-items:center; gap:4px; font-size:11px; color:#555; }
+.prog-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 /* カウントダウン */
-.countdown-card { background:linear-gradient(135deg,#1a237e,#1565c0,#0d47a1); border-radius:14px; padding:1.25rem; margin-bottom:1.25rem; color:white; text-align:center; }
-.countdown-days { font-size:56px; font-weight:800; line-height:1; letter-spacing:-2px; }
-.countdown-unit { font-size:13px; opacity:0.8; margin-top:2px; }
-.countdown-hms { font-size:22px; font-weight:600; letter-spacing:1px; margin-top:6px; opacity:0.9; }
-.countdown-label { font-size:11px; opacity:0.6; margin-bottom:8px; }
-.norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:4px 14px; font-size:13px; font-weight:600; margin-top:10px; }
-.test-date-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; margin-top:8px; }
+.countdown-card { background:linear-gradient(135deg,#1a237e,#1565c0,#0d47a1); border-radius:14px; padding:1rem; margin-bottom:0.8rem; color:white; text-align:center; }
+.countdown-days { font-size:48px; font-weight:800; line-height:1; letter-spacing:-2px; }
+.countdown-unit { font-size:12px; opacity:0.8; margin-top:2px; }
+.countdown-hms { font-size:18px; font-weight:600; letter-spacing:1px; margin-top:4px; opacity:0.9; }
+.countdown-label { font-size:10px; opacity:0.6; margin-bottom:6px; }
+.norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600; margin-top:6px; }
+.test-date-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:8px; padding:5px 10px; font-size:11px; cursor:pointer; font-family:inherit; margin-top:6px; }
 .test-date-btn:hover { background:rgba(255,255,255,0.25); }
 /* 覚えた単語復習ボタン */
 .btn-learned { background: linear-gradient(135deg,#1b5e20,#2e7d32); color:white; }
@@ -262,9 +262,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" onchange="updatePlayerName()" onkeydown="if(event.key==='Enter'){ updatePlayerName(); this.blur(); }">
       <div style="font-size:12px;color:#666;margin-top:6px;">クイズを始める前に名前を入力すると、成績がランキングに保存されます。</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
+    <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:1rem;">
       <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 ランキングを見る</button>
-      <button class="big-btn btn-secondary" id="btn-share-leaderboard" onclick="shareLeaderboard()" disabled>📤 ランキングを共有</button>
     </div>
     <div class="card" style="margin-bottom:1.25rem;">
       <div class="label">ランキングトップ</div>
@@ -308,10 +307,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="text-align:right;font-size:13px;font-weight:700;color:#2D7DD2;" id="progress-pct">0.0%</div>
     </div>
 
-    <button class="big-btn btn-primary" onclick="showScreen('screen-setup')">✏️ 通常モードで学習</button>
-    <button class="big-btn btn-secondary" onclick="openRandomModal()">🎲 ランダムN問</button>
-    <button class="big-btn btn-friend" onclick="openFriendSetupModal()">👫 友達モード</button>
-    <button class="big-btn btn-secondary" id="btn-weak-home" style="display:none;background:#fff8e1;border-color:#ffcc80;color:#e65100;" onclick="startWeakWords()">⚠️ 間違えやすい問題集</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
+      <button class="big-btn btn-primary" onclick="showScreen('screen-setup')">✏️ 通常モードで学習</button>
+      <button class="big-btn btn-secondary" onclick="openRandomModal()">🎲 ランダムN問</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
+      <button class="big-btn btn-friend" onclick="openFriendSetupModal()">👫 友達モード</button>
+      <button class="big-btn btn-secondary" id="btn-weak-home" style="display:none;background:#fff8e1;border-color:#ffcc80;color:#e65100;" onclick="startWeakWords()">⚠️ 間違えやすい問題集</button>
+    </div>
   </div>
 
   <!-- ══ SETUP（通常モード） ════════════════════════════ -->
@@ -735,6 +738,7 @@ async function initApp() {
   updateStats();
   updateLeaderboardAccess();
   updateRangeSliders();
+  initSwipeDetection();
   if (!playerName) openNameModal();
   startCountdown();
 }
@@ -1145,9 +1149,7 @@ function updatePlayerName(){
 function updateLeaderboardAccess(){
   const enabled = Boolean(playerName);
   const openBtn = document.getElementById('btn-open-leaderboard');
-  const shareBtn = document.getElementById('btn-share-leaderboard');
   if(openBtn) openBtn.disabled = !enabled;
-  if(shareBtn) shareBtn.disabled = !enabled;
   const summaryEl = document.getElementById('leaderboard-summary');
   if(summaryEl){
     summaryEl.textContent = enabled
@@ -1234,8 +1236,8 @@ function addLeaderboardEntry(name, correct, total){
   }
   normalizeLeaderboard();
   leaderboard = leaderboard.sort((a,b)=>{
-    if(b.pct !== a.pct) return b.pct - a.pct;
     if(b.correct !== a.correct) return b.correct - a.correct;
+    if(b.pct !== a.pct) return b.pct - a.pct;
     return new Date(b.date) - new Date(a.date);
   }).slice(0, 10);
   saveStorage();
@@ -1248,20 +1250,70 @@ function openLeaderboardModal(){
   document.getElementById('leaderboard-modal').classList.add('open');
 }
 function closeLeaderboardModal(){ document.getElementById('leaderboard-modal').classList.remove('open'); }
-function shareLeaderboard(){
-  if(!playerName){ alert('ランキングを共有するにはまず名前を入力してください。'); return; }
-  if(!leaderboard.length){ alert('ランキングがまだありません。'); return; }
-  const lines = leaderboard.slice(0,5).map((entry,i)=>
-    `${i+1}. ${entry.name} ${entry.pct}% (${entry.correct}/${entry.total})`
-  ).join('\n');
-  const text = `単語復習アプリのランキング\n${lines}\n名前: ${playerName}`;
-  if(navigator.share){
-    navigator.share({ title:'ランキングを共有', text }).catch(() => {});
-  } else if(navigator.clipboard){
-    navigator.clipboard.writeText(text).then(() => alert('ランキングをコピーしました')).catch(() => prompt('以下をコピーして共有してください', text));
-  } else {
-    prompt('以下をコピーして共有してください', text);
+
+let adminMode = false;
+let swipeHistory = [];
+
+function initSwipeDetection(){
+  const card = document.getElementById('countdown-card');
+  if(!card) return;
+  let touchStartX = 0;
+  card.addEventListener('touchstart', (e)=>{ touchStartX = e.touches[0].clientX; });
+  card.addEventListener('touchend', (e)=>{
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchEndX - touchStartX;
+    if(Math.abs(diff) > 50){
+      if(diff > 0){ swipeHistory.push('R'); } else { swipeHistory.push('L'); }
+      if(swipeHistory.length > 4) swipeHistory.shift();
+      if(swipeHistory.join('') === 'RLRL') {
+        adminMode = true;
+        swipeHistory = [];
+        openAdminModal();
+      }
+    }
+  });
+}
+
+function openAdminModal(){
+  let modal = document.getElementById('admin-modal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.id = 'admin-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `<div class="modal-box" style="max-width:400px;">
+      <div class="modal-title">⚙️ Admin Mode</div>
+      <div class="card">
+        <div class="label">テスト日を変更</div>
+        <input type="date" id="admin-test-date" class="text-input" value="">
+      </div>
+      <button class="big-btn btn-primary" onclick="saveAdminTestDate()">保存</button>
+      <button class="big-btn btn-secondary" onclick="closeAdminModal()">キャンセル</button>
+    </div>`;
+    document.body.appendChild(modal);
   }
+  const dateInput = document.getElementById('admin-test-date');
+  if(dateInput && testDate){
+    const year = testDate.getFullYear();
+    const month = String(testDate.getMonth()+1).padStart(2,'0');
+    const date = String(testDate.getDate()).padStart(2,'0');
+    dateInput.value = `${year}-${month}-${date}`;
+  }
+  document.getElementById('admin-modal').classList.add('open');
+}
+
+function closeAdminModal(){
+  const modal = document.getElementById('admin-modal');
+  if(modal) modal.classList.remove('open');
+}
+
+function saveAdminTestDate(){
+  const input = document.getElementById('admin-test-date');
+  if(!input || !input.value) return;
+  testDate = new Date(input.value + 'T00:00:00');
+  localStorage.setItem('testDate', testDate.toISOString());
+  startCountdown();
+  closeAdminModal();
+  alert('テスト日を更新しました');
 }
 
 function renderLeaderboard(){
@@ -1274,13 +1326,16 @@ function renderLeaderboard(){
   el.innerHTML = leaderboard.map((entry,i)=>{
     const date = new Date(entry.date);
     const dateLabel = `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
-    return `<div class="review-item" style="padding:10px 12px;margin-bottom:8px;">
+    return `<div class="review-item" style="padding:12px;margin-bottom:10px;border:1px solid #e0e0e0;border-radius:8px;background:#f9f9f9;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-        <div style="min-width:0;">
-          <div class="review-en">${i+1}. ${entry.name}</div>
-          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel} · ${entry.correct}/${entry.total}問 · ${entry.pct}%</div>
+        <div style="min-width:0;flex:1;">
+          <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">${i+1}. ${entry.name}</div>
+          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel} · ${entry.correct}/${entry.total}問</div>
         </div>
-        <div><span class="badge-num">${entry.pct}%</span></div>
+        <div style="text-align:center;">
+          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;">${entry.correct}</span>
+          <div style="font-size:11px;color:#888;margin-top:2px;">覚えた</div>
+        </div>
       </div>
     </div>`;
   }).join('');
