@@ -259,7 +259,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="card" style="margin-bottom:1rem;">
       <div class="label">名前（ランキング表示用）</div>
-      <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" oninput="updatePlayerName()">
+      <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" onchange="updatePlayerName()" onkeydown="if(event.key==='Enter'){ updatePlayerName(); this.blur(); }">
       <div style="font-size:12px;color:#666;margin-top:6px;">クイズを始める前に名前を入力すると、成績がランキングに保存されます。</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
@@ -566,8 +566,67 @@ const WORD_STORE = 'words';
 const LS_KEY = 'vocab_app_v3';
 const RANKING_KEY = 'vocab_leaderboard';
 
+let playerId = '';
 let playerName = '';
+let playerNameHistory = [];
 let leaderboard = [];
+
+function genPlayerId() {
+  return 'uid_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+}
+
+function ensurePlayerId() {
+  if (!playerId) playerId = genPlayerId();
+  return playerId;
+}
+
+function isCurrentPlayerEntry(entry) {
+  if (!entry) return false;
+  if (entry.playerId && playerId) return entry.playerId === playerId;
+  if (!entry.playerId && playerId) {
+    if (entry.name === playerName) return true;
+    return playerNameHistory.includes(entry.name);
+  }
+  return false;
+}
+
+function normalizeLeaderboard() {
+  const merged = new Map();
+  const normalized = [];
+  leaderboard.forEach(entry => {
+    let id = entry.playerId || '';
+    if (!id && playerId && (entry.name === playerName || playerNameHistory.includes(entry.name))) {
+      id = playerId;
+    }
+    if (id === playerId) {
+      const key = playerId;
+      const current = merged.get(key);
+      const mergedEntry = {
+        playerId: playerId,
+        name: playerName || entry.name,
+        correct: entry.correct || 0,
+        total: entry.total || 0,
+        date: entry.date || new Date().toISOString(),
+      };
+      if (current) {
+        mergedEntry.correct = current.correct + mergedEntry.correct;
+        mergedEntry.total = current.total + mergedEntry.total;
+        mergedEntry.date = current.date > mergedEntry.date ? current.date : mergedEntry.date;
+        mergedEntry.name = playerName || current.name || mergedEntry.name;
+      }
+      merged.set(key, mergedEntry);
+    } else {
+      normalized.push(entry);
+    }
+  });
+  if (merged.size) {
+    merged.forEach(entry => {
+      entry.pct = entry.total > 0 ? Math.round((entry.correct / entry.total) * 100) : 0;
+      normalized.push(entry);
+    });
+  }
+  leaderboard = normalized;
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -628,7 +687,9 @@ function saveStorage() {
       reviewWords,
       learnedCount: state.learnedCount,
       sessions: state.sessions,
+      playerId,
       playerName,
+      playerNameHistory,
       leaderboard
     }));
   } catch {}
@@ -659,8 +720,12 @@ async function init() {
   if (s.reviewWords)  reviewWords = s.reviewWords.map(rw => ({ word: ALL_WORDS.find(w => w.id === rw.word.id) || rw.word, dir: rw.dir }));
   if (s.learnedCount) state.learnedCount = s.learnedCount;
   if (s.sessions)     state.sessions = s.sessions;
-  if (s.playerName)   playerName = s.playerName;
+  if (s.playerId) playerId = s.playerId;
+  if (s.playerNameHistory && Array.isArray(s.playerNameHistory)) playerNameHistory = s.playerNameHistory;
+  if (s.playerName) playerName = s.playerName;
   if (Array.isArray(s.leaderboard)) leaderboard = s.leaderboard;
+  if (!playerId) ensurePlayerId();
+  normalizeLeaderboard();
   const nameInput = document.getElementById('player-name');
   if (nameInput) nameInput.value = playerName;
 }
@@ -1065,7 +1130,14 @@ function updateStats(){
 function updatePlayerName(){
   const input=document.getElementById('player-name');
   if(!input) return;
-  playerName = input.value.trim();
+  const newName = input.value.trim();
+  if (newName && newName !== playerName) {
+    if (playerName && !playerNameHistory.includes(playerName)) {
+      playerNameHistory.push(playerName);
+    }
+    playerName = newName;
+    normalizeLeaderboard();
+  }
   saveStorage();
   updateLeaderboardAccess();
 }
@@ -1120,9 +1192,13 @@ function submitPlayerNameModal(){
     input.focus();
     return;
   }
+  if (playerName && playerName !== name && !playerNameHistory.includes(playerName)) {
+    playerNameHistory.push(playerName);
+  }
   playerName = name;
   const homeInput = document.getElementById('player-name');
   if(homeInput) homeInput.value = playerName;
+  normalizeLeaderboard();
   saveStorage();
   updateLeaderboardAccess();
   closeNameModal();
@@ -1130,15 +1206,34 @@ function submitPlayerNameModal(){
 
 function addLeaderboardEntry(name, correct, total){
   if(!name || total <= 0) return;
+  ensurePlayerId();
+  normalizeLeaderboard();
+  const normalizedName = name.trim().slice(0, 20) || '名無し';
   const pct = Math.round((correct/total)*100);
-  const entry = {
-    name: name.trim().slice(0, 20) || '名無し',
-    correct,
-    total,
-    pct,
-    date: new Date().toISOString()
-  };
-  leaderboard = [...leaderboard, entry].sort((a,b)=>{
+  const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
+  if (existingIndex !== -1) {
+    const existing = leaderboard[existingIndex];
+    const merged = {
+      playerId,
+      name: normalizedName,
+      correct: (existing.correct || 0) + correct,
+      total: (existing.total || 0) + total,
+      date: new Date().toISOString()
+    };
+    merged.pct = Math.round((merged.correct/merged.total)*100);
+    leaderboard[existingIndex] = merged;
+  } else {
+    leaderboard = [...leaderboard, {
+      playerId,
+      name: normalizedName,
+      correct,
+      total,
+      pct,
+      date: new Date().toISOString()
+    }];
+  }
+  normalizeLeaderboard();
+  leaderboard = leaderboard.sort((a,b)=>{
     if(b.pct !== a.pct) return b.pct - a.pct;
     if(b.correct !== a.correct) return b.correct - a.correct;
     return new Date(b.date) - new Date(a.date);
