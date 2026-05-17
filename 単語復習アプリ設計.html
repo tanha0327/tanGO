@@ -246,8 +246,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="card" style="margin-bottom:1rem;">
       <div class="label">名前（ランキング表示用）</div>
-      <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してランキングに参加" oninput="updatePlayerName()">
-      <div style="font-size:12px;color:#666;margin-top:6px;">名前を入力すると結果がランキングに保存されます。</div>
+      <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" oninput="updatePlayerName()">
+      <div style="font-size:12px;color:#666;margin-top:6px;">クイズを始める前に名前を入力すると、成績がランキングに保存されます。</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
       <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 ランキングを見る</button>
@@ -753,6 +753,7 @@ function closeReviewModal() { document.getElementById('review-modal').classList.
 
 // ─── 学習開始：通常モード ────────────────────────────────
 function startStudy() {
+  if(!requirePlayerName()) return;
   const fi=parseInt(document.getElementById('range-from').value)||0;
   const ti=parseInt(document.getElementById('range-to').value)||0;
   const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
@@ -788,6 +789,7 @@ function getSmartRandomQueue(n, dir) {
 }
 
 function startRandomN() {
+  if(!requirePlayerName()) return;
   closeRandomModal();
   const n=parseInt(document.getElementById('random-n-slider').value)||50;
   state.queue=getSmartRandomQueue(n,state.rnDir);
@@ -798,6 +800,7 @@ function startRandomN() {
 
 // ─── 学習開始：友達モード ────────────────────────────────
 function startFriendMode() {
+  if(!requirePlayerName()) return;
   closeFriendSetupModal();
   const n=parseInt(document.getElementById('friend-n-slider').value)||50;
   state.queue=getSmartRandomQueue(n,state.frDir);
@@ -807,6 +810,7 @@ function startFriendMode() {
 
 // ─── 学習開始：復習 ──────────────────────────────────────
 function startReviewQuiz() {
+  if(!requirePlayerName()) return;
   closeReviewModal();
   if(!reviewWords.length){return;}
   const sorted=[...reviewWords].sort((a,b)=>(missRate(b.word.id,b.dir)??0)-(missRate(a.word.id,a.dir)??0));
@@ -818,6 +822,7 @@ function startReviewQuiz() {
 
 // ─── 学習開始：間違えやすい問題集 ───────────────────────
 function startWeakWords() {
+  if(!requirePlayerName()) return;
   const weak=[];
   ALL_WORDS.forEach(w=>{ ['jp-en','en-jp'].forEach(dir=>{ const mr=missRate(w.id,dir); if(mr!==null&&mr>0.3) weak.push({word:w,dir,mr}); }); });
   if(!weak.length){alert('正解率70%以下の単語がまだありません');return;}
@@ -1051,6 +1056,15 @@ function updateLeaderboardAccess(){
       ? (leaderboard.length ? '' : 'まだランキングがありません。クイズを完了して結果をランキングに残しましょう。')
       : '名前を入力するとランキングが見られます。';
   }
+}
+
+function requirePlayerName(){
+  if(playerName) return true;
+  alert('クイズを始める前に、名前を入力してください。');
+  showScreen('screen-home');
+  const input = document.getElementById('player-name');
+  if(input){ input.focus(); }
+  return false;
 }
 
 function addLeaderboardEntry(name, correct, total){
@@ -1292,6 +1306,7 @@ function renderLearnedReviewList(){
 }
 
 function startLearnedReview(){
+  if(!requirePlayerName()) return;
   closeLearnedReviewModal();
   const learnedWords = ALL_WORDS.filter(w=>{
     const s=wordStats[skey(w.id,lrDir)];
