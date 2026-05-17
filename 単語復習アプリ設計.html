@@ -939,11 +939,11 @@ function finishQuiz(isExit){
     if(!reviewWords.find(rw=>skey(rw.word.id,rw.dir)===k)) reviewWords.push({word:r.word,dir:r.dir});
   });
   saveStorage(); updateStats();
-  if(isExit){showScreen('screen-home');return;}
   const total=state.results.length;
   if (playerName) {
     addLeaderboardEntry(playerName, correct, total);
   }
+  if(isExit){showScreen('screen-home');return;}
   const pct=Math.round((correct/total)*100);
   document.getElementById('result-emoji').textContent=pct>=80?'🎉':pct>=50?'💪':'📚';
   document.getElementById('result-title').textContent=pct>=80?'すばらしい！':pct>=50?'もう少し！':'復習しよう';
