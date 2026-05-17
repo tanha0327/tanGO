@@ -183,6 +183,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
+<!-- ランキングモーダル -->
+<div class="modal-overlay" id="leaderboard-modal">
+  <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div class="modal-title" style="margin:0;">🏆 ランキング</div>
+      <button onclick="closeLeaderboardModal()" style="border:none;background:none;font-size:24px;cursor:pointer;color:#aaa;line-height:1;">×</button>
+    </div>
+    <div id="leaderboard-content"></div>
+    <div style="font-size:12px;color:#888;margin-top:10px;">名前を入力しておくと、成績がランキングに反映されます。</div>
+  </div>
+</div>
+
 <!-- 復習モーダル -->
 <div class="modal-overlay" id="review-modal">
   <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
@@ -227,7 +239,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="countdown-unit">日</div>
       <div class="countdown-hms" id="countdown-hms">--:--:--</div>
       <div id="norma-area"></div>
-      <button class="test-date-btn" onclick="openTestDateModal()">📅 テスト日を設定</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="test-date-btn" onclick="openTestDateModal()">📅 テスト日を設定</button>
+        <button class="test-date-btn" onclick="shareTestDate()">📤 テスト日を共有</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="label">名前（ランキング表示用）</div>
+      <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してランキングに参加" oninput="updatePlayerName()">
+      <div style="font-size:12px;color:#666;margin-top:6px;">名前を入力すると結果がランキングに保存されます。</div>
+    </div>
+    <button class="big-btn btn-secondary" onclick="openLeaderboardModal()" style="margin-bottom:1rem;">🏆 ランキングを見る</button>
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div class="label">ランキングトップ</div>
+      <div id="leaderboard-summary" style="font-size:13px;color:#555;line-height:1.6;min-height:70px;">ランキングに参加するとここに上位が表示されます。</div>
     </div>
     <div class="stat-grid">
       <div class="stat-card clickable" onclick="openLearnedReviewModal()" title="タップして覚えた単語を復習">
@@ -518,15 +543,79 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1540	poison	毒，毒薬／を毒する，を害する
 1541	alarm	警報(器)，目覚まし時計／驚き，恐怖／に警報を発する`;
 
-const ALL_WORDS = RAW.trim().split('\n').map(line => {
-  const p = line.split('\t');
-  return { id: parseInt(p[0]), en: p[1].trim(), jp: p[2].trim() };
-});
-
-// ─── 永続化 ──────────────────────────────────────────────
+let ALL_WORDS = [];
+const DB_NAME = 'vocab_app_db';
+const DB_VERSION = 1;
+const WORD_STORE = 'words';
 const LS_KEY = 'vocab_app_v3';
+const RANKING_KEY = 'vocab_leaderboard';
+
+let playerName = '';
+let leaderboard = [];
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB is not supported')); return; }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = event => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(WORD_STORE)) {
+        const store = db.createObjectStore(WORD_STORE, { keyPath: 'id' });
+        store.createIndex('by_id', 'id', { unique: true });
+      }
+    };
+    request.onsuccess = event => resolve(event.target.result);
+    request.onerror = event => reject(event.target.error);
+  });
+}
+
+function getAllWordsFromDb(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(WORD_STORE, 'readonly');
+    const store = tx.objectStore(WORD_STORE);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result.sort((a,b)=>a.id-b.id));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveWordsToDb(db, words) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(WORD_STORE, 'readwrite');
+    const store = tx.objectStore(WORD_STORE);
+    words.forEach(w => store.put(w));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function ensureWordsDatabase() {
+  const initialWords = RAW.trim().split('\n').map(line => {
+    const p = line.split('\t');
+    return { id: parseInt(p[0], 10), en: p[1].trim(), jp: p[2].trim() };
+  });
+  try {
+    const db = await openDatabase();
+    const existing = await getAllWordsFromDb(db);
+    if (existing.length > 0) return existing;
+    await saveWordsToDb(db, initialWords);
+    return initialWords;
+  } catch (e) {
+    return initialWords;
+  }
+}
+
 function saveStorage() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ wordStats, reviewWords, learnedCount: state.learnedCount, sessions: state.sessions })); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      wordStats,
+      reviewWords,
+      learnedCount: state.learnedCount,
+      sessions: state.sessions,
+      playerName,
+      leaderboard
+    }));
+  } catch {}
 }
 function loadStorage() {
   try { const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
@@ -546,14 +635,26 @@ const state = {
 };
 let resultShowing = false;
 
-(function init() {
+async function init() {
+  ALL_WORDS = await ensureWordsDatabase();
   const s = loadStorage();
   if (!s) return;
   if (s.wordStats)    wordStats = s.wordStats;
   if (s.reviewWords)  reviewWords = s.reviewWords.map(rw => ({ word: ALL_WORDS.find(w => w.id === rw.word.id) || rw.word, dir: rw.dir }));
   if (s.learnedCount) state.learnedCount = s.learnedCount;
   if (s.sessions)     state.sessions = s.sessions;
-})();
+  if (s.playerName)   playerName = s.playerName;
+  if (Array.isArray(s.leaderboard)) leaderboard = s.leaderboard;
+  const nameInput = document.getElementById('player-name');
+  if (nameInput) nameInput.value = playerName;
+}
+
+async function initApp() {
+  await init();
+  updateStats();
+  updateRangeSliders();
+  startCountdown();
+}
 
 // ─── ユーティリティ ──────────────────────────────────────
 function shuffle(arr) { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
@@ -836,6 +937,9 @@ function finishQuiz(isExit){
   saveStorage(); updateStats();
   if(isExit){showScreen('screen-home');return;}
   const total=state.results.length;
+  if (playerName) {
+    addLeaderboardEntry(playerName, correct, total);
+  }
   const pct=Math.round((correct/total)*100);
   document.getElementById('result-emoji').textContent=pct>=80?'🎉':pct>=50?'💪':'📚';
   document.getElementById('result-title').textContent=pct>=80?'すばらしい！':pct>=50?'もう少し！':'復習しよう';
@@ -884,6 +988,17 @@ function updateStats(){
   const rcEl=document.getElementById('stat-review-count');
   rcEl.textContent=n; rcEl.className='stat-num'+(n>0?' danger':'');
 
+  const summaryEl = document.getElementById('leaderboard-summary');
+  if (summaryEl) {
+    if (!leaderboard.length) {
+      summaryEl.textContent = 'ランキングはまだありません。名前を入力して結果を残そう。';
+    } else {
+      summaryEl.innerHTML = leaderboard.slice(0,3).map((entry, i) =>
+        `<div style="margin-bottom:6px;">${i+1}. ${entry.name} — ${entry.pct}% (${entry.correct}/${entry.total})</div>`
+      ).join('');
+    }
+  }
+
   // 間違えやすい問題集ボタン
   const hasWeak=ALL_WORDS.some(w=>['jp-en','en-jp'].some(dir=>{const mr=missRate(w.id,dir);return mr!==null&&mr>0.3;}));
   const wb=document.getElementById('btn-weak-home');
@@ -912,8 +1027,60 @@ function updateStats(){
   document.getElementById('progress-pct').textContent=learnedPct.toFixed(1)+'%';
 }
 
-updateStats();
-updateRangeSliders();
+function updatePlayerName(){
+  const input=document.getElementById('player-name');
+  if(!input) return;
+  playerName = input.value.trim();
+  saveStorage();
+}
+
+function addLeaderboardEntry(name, correct, total){
+  if(!name || total <= 0) return;
+  const pct = Math.round((correct/total)*100);
+  const entry = {
+    name: name.trim().slice(0, 20) || '名無し',
+    correct,
+    total,
+    pct,
+    date: new Date().toISOString()
+  };
+  leaderboard = [...leaderboard, entry].sort((a,b)=>{
+    if(b.pct !== a.pct) return b.pct - a.pct;
+    if(b.correct !== a.correct) return b.correct - a.correct;
+    return new Date(b.date) - new Date(a.date);
+  }).slice(0, 10);
+  saveStorage();
+  updateStats();
+}
+
+function openLeaderboardModal(){
+  renderLeaderboard();
+  document.getElementById('leaderboard-modal').classList.add('open');
+}
+function closeLeaderboardModal(){ document.getElementById('leaderboard-modal').classList.remove('open'); }
+function renderLeaderboard(){
+  const el = document.getElementById('leaderboard-content');
+  if(!el) return;
+  if(!leaderboard.length){
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">ランキングはまだありません。</div>';
+    return;
+  }
+  el.innerHTML = leaderboard.map((entry,i)=>{
+    const date = new Date(entry.date);
+    const dateLabel = `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
+    return `<div class="review-item" style="padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="min-width:0;">
+          <div class="review-en">${i+1}. ${entry.name}</div>
+          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel} · ${entry.correct}/${entry.total}問 · ${entry.pct}%</div>
+        </div>
+        <div><span class="badge-num">${entry.pct}%</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+initApp();
 
 // ─── テスト日 ────────────────────────────────────────────────
 let testDate = null; // Date object
@@ -956,6 +1123,21 @@ function clearTestDate(){
   try { localStorage.removeItem('vocab_testdate'); } catch {}
   closeTestDateModal();
   startCountdown();
+}
+
+function shareTestDate(){
+  if (!testDate) { alert('テスト日を設定してください'); return; }
+  const pad = n => String(n).padStart(2, '0');
+  const y=testDate.getFullYear(), mo=testDate.getMonth()+1, d=testDate.getDate();
+  const h=testDate.getHours(), mi=testDate.getMinutes();
+  const text = `単語復習アプリのテスト日を共有します\n${y}/${pad(mo)}/${pad(d)} ${pad(h)}:${pad(mi)}\n一緒に勉強しましょう！`;
+  if (navigator.share) {
+    navigator.share({ title:'テスト日を共有', text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => alert('テスト日の共有テキストをコピーしました')).catch(() => prompt('以下をコピーして共有してください', text));
+  } else {
+    prompt('以下のテキストをコピーして共有してください', text);
+  }
 }
 
 function startCountdown(){
