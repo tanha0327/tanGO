@@ -157,7 +157,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <span>1問</span><span id="random-n-max-lbl">141問（全部）</span>
     </div>
     <div class="slider-wrap" style="margin-bottom:1rem;">
-      <input type="range" id="random-n-slider" min="1" max="141" value="50" oninput="updateRandomN(this.value)">
+      <input type="range" id="random-n-slider" min="1" max="141" value="50" oninput="updateRandomN(this.value, true)">
     </div>
     <div class="card" style="margin-bottom:1rem;">
       <div class="label">問題の方向</div>
@@ -728,9 +728,13 @@ function openExitModal() { document.getElementById('exit-modal').classList.add('
 function closeExitModal() { document.getElementById('exit-modal').classList.remove('open'); }
 function confirmExit() { closeExitModal(); if(state.results.length===0){showScreen('screen-home');updateStats();return;} finishQuiz(true); }
 
-function updateRandomN(val) {
+function updateRandomN(val, isUserInput = false) {
   const n = parseInt(val);
   const max = parseInt(document.getElementById('random-n-slider').max) || 141;
+  if (isUserInput) {
+    const sl = document.getElementById('random-n-slider');
+    if (sl) sl.dataset.userChanged = '1';
+  }
   const ratio = (n - 1) / Math.max(max - 1, 1); // 0.0〜1.0
   // 青(#2D7DD2) → 黄(#f5a623) → 赤(#e53935) のグラデーション
   let r, g, b;
@@ -1331,7 +1335,7 @@ openRandomModal = function(){
       const unknown=Math.max(0,TOTAL-learned-studying);
       const norma=Math.ceil((studying+unknown)/(days+1));
       const sl=document.getElementById('random-n-slider');
-      if(sl){ sl.value=Math.min(norma,parseInt(sl.max)||141); updateRandomN(sl.value); }
+      if(sl){ sl.dataset.userChanged = ''; sl.value=Math.min(norma,parseInt(sl.max)||141); updateRandomN(sl.value); }
     }
   }
 };
