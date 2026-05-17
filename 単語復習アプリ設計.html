@@ -249,10 +249,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してランキングに参加" oninput="updatePlayerName()">
       <div style="font-size:12px;color:#666;margin-top:6px;">名前を入力すると結果がランキングに保存されます。</div>
     </div>
-    <button class="big-btn btn-secondary" onclick="openLeaderboardModal()" style="margin-bottom:1rem;">🏆 ランキングを見る</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
+      <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 ランキングを見る</button>
+      <button class="big-btn btn-secondary" id="btn-share-leaderboard" onclick="shareLeaderboard()" disabled>📤 ランキングを共有</button>
+    </div>
     <div class="card" style="margin-bottom:1.25rem;">
       <div class="label">ランキングトップ</div>
-      <div id="leaderboard-summary" style="font-size:13px;color:#555;line-height:1.6;min-height:70px;">ランキングに参加するとここに上位が表示されます。</div>
+      <div id="leaderboard-summary" style="font-size:13px;color:#555;line-height:1.6;min-height:70px;">名前を入力するとランキングが見られます。</div>
     </div>
     <div class="stat-grid">
       <div class="stat-card clickable" onclick="openLearnedReviewModal()" title="タップして覚えた単語を復習">
@@ -652,6 +655,7 @@ async function init() {
 async function initApp() {
   await init();
   updateStats();
+  updateLeaderboardAccess();
   updateRangeSliders();
   startCountdown();
 }
@@ -1032,6 +1036,21 @@ function updatePlayerName(){
   if(!input) return;
   playerName = input.value.trim();
   saveStorage();
+  updateLeaderboardAccess();
+}
+
+function updateLeaderboardAccess(){
+  const enabled = Boolean(playerName);
+  const openBtn = document.getElementById('btn-open-leaderboard');
+  const shareBtn = document.getElementById('btn-share-leaderboard');
+  if(openBtn) openBtn.disabled = !enabled;
+  if(shareBtn) shareBtn.disabled = !enabled;
+  const summaryEl = document.getElementById('leaderboard-summary');
+  if(summaryEl){
+    summaryEl.textContent = enabled
+      ? (leaderboard.length ? '' : 'まだランキングがありません。クイズを完了して結果をランキングに残しましょう。')
+      : '名前を入力するとランキングが見られます。';
+  }
 }
 
 function addLeaderboardEntry(name, correct, total){
@@ -1054,10 +1073,27 @@ function addLeaderboardEntry(name, correct, total){
 }
 
 function openLeaderboardModal(){
+  if(!playerName){ alert('ランキングを見るにはまず名前を入力してください。'); return; }
   renderLeaderboard();
   document.getElementById('leaderboard-modal').classList.add('open');
 }
 function closeLeaderboardModal(){ document.getElementById('leaderboard-modal').classList.remove('open'); }
+function shareLeaderboard(){
+  if(!playerName){ alert('ランキングを共有するにはまず名前を入力してください。'); return; }
+  if(!leaderboard.length){ alert('ランキングがまだありません。'); return; }
+  const lines = leaderboard.slice(0,5).map((entry,i)=>
+    `${i+1}. ${entry.name} ${entry.pct}% (${entry.correct}/${entry.total})`
+  ).join('\n');
+  const text = `単語復習アプリのランキング\n${lines}\n名前: ${playerName}`;
+  if(navigator.share){
+    navigator.share({ title:'ランキングを共有', text }).catch(() => {});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(() => alert('ランキングをコピーしました')).catch(() => prompt('以下をコピーして共有してください', text));
+  } else {
+    prompt('以下をコピーして共有してください', text);
+  }
+}
+
 function renderLeaderboard(){
   const el = document.getElementById('leaderboard-content');
   if(!el) return;
