@@ -120,6 +120,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
+<!-- 名前入力モーダル -->
+<div class="modal-overlay" id="name-modal">
+  <div class="modal-box">
+    <div class="modal-title">🙋‍♂️ ニックネームを入力してください</div>
+    <div style="margin-bottom:1rem;">
+      <div class="label">名前</div>
+      <input type="text" id="player-name-modal" class="text-input" placeholder="例: タロウ" oninput="updatePlayerNameModal()">
+      <div style="font-size:12px;color:#666;margin-top:6px;">この名前はランキングで表示されます。</div>
+    </div>
+    <button class="big-btn btn-primary" onclick="submitPlayerNameModal()">はじめる</button>
+  </div>
+</div>
+
 <!-- 途中退出モーダル -->
 <div class="modal-overlay" id="exit-modal">
   <div class="modal-box">
@@ -657,6 +670,7 @@ async function initApp() {
   updateStats();
   updateLeaderboardAccess();
   updateRangeSliders();
+  if (!playerName) openNameModal();
   startCountdown();
 }
 
@@ -674,7 +688,15 @@ function totalAttempts(w) {
 }
 
 // ─── 画面 ────────────────────────────────────────────────
-function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('visible')); document.getElementById(id).classList.add('visible'); }
+function showScreen(id) {
+  if(id === 'screen-home' && !playerName){
+    openNameModal();
+    return;
+  }
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('visible'));
+  const screen = document.getElementById(id);
+  if(screen) screen.classList.add('visible');
+}
 
 // ─── スライダー ──────────────────────────────────────────
 function updateRangeSliders() {
@@ -1060,11 +1082,46 @@ function updateLeaderboardAccess(){
 
 function requirePlayerName(){
   if(playerName) return true;
-  alert('クイズを始める前に、名前を入力してください。');
-  showScreen('screen-home');
-  const input = document.getElementById('player-name');
-  if(input){ input.focus(); }
+  openNameModal();
   return false;
+}
+
+function openNameModal(){
+  const modal = document.getElementById('name-modal');
+  const input = document.getElementById('player-name-modal');
+  if(input){ input.value = playerName || ''; }
+  if(modal){
+    modal.classList.add('open');
+    setTimeout(()=>{ if(input) input.focus(); }, 100);
+  }
+}
+
+function closeNameModal(){
+  const modal = document.getElementById('name-modal');
+  if(modal) modal.classList.remove('open');
+}
+
+function updatePlayerNameModal(){
+  const input = document.getElementById('player-name-modal');
+  if(!input) return;
+  playerName = input.value.trim();
+}
+
+function submitPlayerNameModal(){
+  const input = document.getElementById('player-name-modal');
+  if(!input) return;
+  const name = input.value.trim();
+  if(!name){
+    alert('名前を入力してください。');
+    input.focus();
+    return;
+  }
+  playerName = name;
+  const homeInput = document.getElementById('player-name');
+  if(homeInput) homeInput.value = playerName;
+  saveStorage();
+  updateLeaderboardAccess();
+  closeNameModal();
 }
 
 function addLeaderboardEntry(name, correct, total){
