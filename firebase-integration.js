@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// 【1】Firebase初期設定コード
+// Firebase Integration Script
+// 【1】Firebase初期設定 【2】Google認証 【3】Firestore操作
 // ═══════════════════════════════════════════════════════════════
 
 const firebaseConfig = {
@@ -12,37 +13,65 @@ const firebaseConfig = {
   measurementId: "G-1FY7HZ1JLE"
 };
 
-// Firebase を初期化
-firebase.initializeApp(firebaseConfig);
-
-// Firebase サービスの参照
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-// ═══════════════════════════════════════════════════════════════
-// 【2】Firebase Authentication - Google ログイン
-// ═══════════════════════════════════════════════════════════════
-
+let auth = null;
+let db = null;
 let currentUser = null;
 
 /**
- * Google ポップアップログイン
- * @returns {Promise<Object>} ユーザー情報 {uid, displayName, email, photoURL}
+ * Firebase を初期化（遅延実行・1回のみ）
+ */
+async function initializeFirebase() {
+  // 既に初期化済みならスキップ
+  if (auth !== null && db !== null) {
+    return true;
+  }
+
+  // Firebase SDK が読み込まれるまで待機（最大 10秒）
+  let attempts = 0;
+  while (typeof firebase === 'undefined' && attempts < 100) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+
+  if (typeof firebase === 'undefined') {
+    console.error('❌ Firebase SDK が読み込まれていません（タイムアウト）');
+    return false;
+  }
+
+  try {
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    auth = firebase.auth();
+    db = firebase.firestore();
+    console.log('✅ Firebase 初期化完了');
+    return true;
+  } catch (error) {
+    console.error('❌ Firebase 初期化失敗:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Google でログイン
  */
 async function loginWithGoogle() {
   try {
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
     const provider = new firebase.auth.GoogleAuthProvider();
     const result = await auth.signInWithPopup(provider);
     const user = result.user;
-    
+
     currentUser = {
       uid: user.uid,
       displayName: user.displayName || 'User',
       email: user.email,
       photoURL: user.photoURL
     };
-    
-    console.log('✅ Google ログイン成功:', currentUser);
+
+    console.log('✅ Google ログイン成功');
     return currentUser;
   } catch (error) {
     console.error('❌ Google ログイン失敗:', error.message);
@@ -55,6 +84,9 @@ async function loginWithGoogle() {
  */
 async function logout() {
   try {
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+    
     await auth.signOut();
     currentUser = null;
     console.log('✅ ログアウト成功');
@@ -65,48 +97,46 @@ async function logout() {
 }
 
 /**
- * ログイン状態を監視（初期化時に1回実行）
- * @param {Function} callback - ログイン状態が変わった時に呼ばれる関数
+ * ログイン状態を監視
  */
 function onAuthStateChangedListener(callback) {
-  auth.onAuthStateChanged((user) => {
-    if (user) {
-      currentUser = {
-        uid: user.uid,
-        displayName: user.displayName || 'User',
-        email: user.email,
-        photoURL: user.photoURL
-      };
-      console.log('✅ ユーザーがログイン中:', currentUser);
-      callback(currentUser);
-    } else {
-      currentUser = null;
-      console.log('⚠️ ユーザーはログアウト状態');
+  (async () => {
+    const initialized = await initializeFirebase();
+    if (!initialized) {
+      console.error('❌ Firebase 初期化失敗');
       callback(null);
+      return;
     }
-  });
+
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUser = {
+          uid: user.uid,
+          displayName: user.displayName || 'User',
+          email: user.email,
+          photoURL: user.photoURL
+        };
+        console.log('✅ ユーザーがログイン中');
+        callback(currentUser);
+      } else {
+        currentUser = null;
+        console.log('⚠️ ユーザーはログアウト状態');
+        callback(null);
+      }
+    });
+  })();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 【3】Cloud Firestore - 単語データの保存と取得
-// ═══════════════════════════════════════════════════════════════
-
 /**
- * クラウドに単語を追加・更新
- * @param {string} uid - ユーザーUID
- * @param {Object} wordData - 単語データ
- *   例: { id: 1, en: "apple", jp: "りんご", attempts: 5, misses: 1 }
- * @returns {Promise<void>}
+ * 単語をクラウドに保存
  */
 async function saveWordToCloud(uid, wordData) {
   try {
-    if (!uid) throw new Error('ユーザーUID が指定されていません');
-    if (!wordData || !wordData.id) throw new Error('単語データが不正です');
-    
-    const wordRef = db.collection('users').doc(uid).collection('words').doc(String(wordData.id));
-    await wordRef.set(wordData, { merge: true });
-    
-    console.log(`✅ 単語 ID:${wordData.id} をクラウドに保存しました`);
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
+    await db.collection('users').doc(uid).collection('words').doc(String(wordData.id)).set(wordData, { merge: true });
+    console.log(`✅ 単語 ID:${wordData.id} をクラウドに保存`);
   } catch (error) {
     console.error('❌ 単語保存失敗:', error.message);
     throw error;
@@ -114,27 +144,22 @@ async function saveWordToCloud(uid, wordData) {
 }
 
 /**
- * 複数の単語をバッチで保存
- * @param {string} uid - ユーザーUID
- * @param {Array<Object>} wordsData - 単語データの配列
- * @returns {Promise<void>}
+ * 複数の単語をバッチ保存
  */
 async function saveWordsToCloudBatch(uid, wordsData) {
   try {
-    if (!uid) throw new Error('ユーザーUID が指定されていません');
-    if (!Array.isArray(wordsData)) throw new Error('単語配列が指定されていません');
-    
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
     const batch = db.batch();
-    
     wordsData.forEach(wordData => {
       if (wordData && wordData.id) {
         const wordRef = db.collection('users').doc(uid).collection('words').doc(String(wordData.id));
         batch.set(wordRef, wordData, { merge: true });
       }
     });
-    
     await batch.commit();
-    console.log(`✅ ${wordsData.length}個の単語をバッチ保存しました`);
+    console.log(`✅ ${wordsData.length}個の単語をバッチ保存`);
   } catch (error) {
     console.error('❌ バッチ保存失敗:', error.message);
     throw error;
@@ -142,60 +167,57 @@ async function saveWordsToCloudBatch(uid, wordsData) {
 }
 
 /**
- * クラウドからユーザーの単語一覧を取得（リアルタイム監視）
- * @param {string} uid - ユーザーUID
- * @param {Function} callback - データが更新された時に呼ばれる関数(words配列を受け取る)
- * @returns {Function} リスナー削除用の関数
+ * クラウドから単語を取得（リアルタイム監視）
  */
 function loadWordsFromCloudRealtime(uid, callback) {
-  try {
-    if (!uid) throw new Error('ユーザーUID が指定されていません');
-    
-    const unsubscribe = db
-      .collection('users')
-      .doc(uid)
-      .collection('words')
-      .orderBy('id', 'asc')
-      .onSnapshot((snapshot) => {
-        const words = [];
-        snapshot.forEach((doc) => {
-          words.push(doc.data());
+  (async () => {
+    try {
+      const initialized = await initializeFirebase();
+      if (!initialized) throw new Error('Firebase 初期化失敗');
+
+      const unsubscribe = db
+        .collection('users')
+        .doc(uid)
+        .collection('words')
+        .orderBy('id', 'asc')
+        .onSnapshot((snapshot) => {
+          const words = [];
+          snapshot.forEach((doc) => {
+            words.push(doc.data());
+          });
+          callback(words);
+        }, (error) => {
+          console.error('❌ リアルタイム監視エラー:', error.message);
         });
-        console.log(`✅ クラウドから ${words.length} 個の単語を読み込みました`);
-        callback(words);
-      }, (error) => {
-        console.error('❌ リアルタイム監視エラー:', error.message);
-      });
-    
-    return unsubscribe; // リスナーを削除したい時は unsubscribe() を呼ぶ
-  } catch (error) {
-    console.error('❌ リアルタイム監視開始失敗:', error.message);
-    throw error;
-  }
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ リアルタイム監視開始失敗:', error.message);
+    }
+  })();
 }
 
 /**
- * クラウドからユーザーの単語一覧を取得（一括取得）
- * @param {string} uid - ユーザーUID
- * @returns {Promise<Array>} 単語データの配列
+ * クラウドから単語を取得（一括取得）
  */
 async function loadWordsFromCloud(uid) {
   try {
-    if (!uid) throw new Error('ユーザーUID が指定されていません');
-    
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
     const snapshot = await db
       .collection('users')
       .doc(uid)
       .collection('words')
       .orderBy('id', 'asc')
       .get();
-    
+
     const words = [];
     snapshot.forEach((doc) => {
       words.push(doc.data());
     });
-    
-    console.log(`✅ クラウドから ${words.length} 個の単語を読み込みました`);
+
+    console.log(`✅ クラウドから ${words.length} 個の単語を取得`);
     return words;
   } catch (error) {
     console.error('❌ 単語読み込み失敗:', error.message);
@@ -204,17 +226,15 @@ async function loadWordsFromCloud(uid) {
 }
 
 /**
- * クラウドから特定の単語を削除
- * @param {string} uid - ユーザーUID
- * @param {number} wordId - 単語ID
- * @returns {Promise<void>}
+ * クラウドから単語を削除
  */
 async function deleteWordFromCloud(uid, wordId) {
   try {
-    if (!uid || !wordId) throw new Error('ユーザーUID と単語ID が必要です');
-    
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
     await db.collection('users').doc(uid).collection('words').doc(String(wordId)).delete();
-    console.log(`✅ 単語 ID:${wordId} をクラウドから削除しました`);
+    console.log(`✅ 単語 ID:${wordId} を削除`);
   } catch (error) {
     console.error('❌ 単語削除失敗:', error.message);
     throw error;
@@ -222,23 +242,19 @@ async function deleteWordFromCloud(uid, wordId) {
 }
 
 /**
- * ユーザーの全単語データをクラウドにシンク
- * @param {string} uid - ユーザーUID
- * @param {Object} localWordStats - ローカルの単語統計データ（wordStats）
- * @returns {Promise<void>}
+ * 全単語データをクラウドに同期
  */
 async function syncAllWordsToCloud(uid, localWordStats) {
   try {
-    if (!uid) throw new Error('ユーザーUID が指定されていません');
-    
+    const initialized = await initializeFirebase();
+    if (!initialized) throw new Error('Firebase 初期化失敗');
+
     const batch = db.batch();
     const wordsRef = db.collection('users').doc(uid).collection('words');
-    
-    // ローカルデータをクラウドに同期
+
     Object.entries(localWordStats).forEach(([key, stats]) => {
       const [wordId, direction] = key.split('_');
       const docRef = wordsRef.doc(wordId);
-      
       batch.set(docRef, {
         id: parseInt(wordId),
         direction,
@@ -247,28 +263,30 @@ async function syncAllWordsToCloud(uid, localWordStats) {
         lastUpdated: new Date().toISOString()
       }, { merge: true });
     });
-    
+
     await batch.commit();
-    console.log('✅ すべての単語をクラウドに同期しました');
+    console.log('✅ 全単語をクラウドに同期');
   } catch (error) {
     console.error('❌ 同期失敗:', error.message);
     throw error;
   }
 }
 
-// HTMLのボタン(onclick)から直接呼び出せるように、窓口を完全に開放します
+// グローバルスコープにエクスポート
+window.initializeFirebase = initializeFirebase;
 window.loginWithGoogle = loginWithGoogle;
 window.logout = logout;
 window.onAuthStateChangedListener = onAuthStateChangedListener;
+window.saveWordToCloud = saveWordToCloud;
+window.saveWordsToCloudBatch = saveWordsToCloudBatch;
+window.loadWordsFromCloud = loadWordsFromCloud;
+window.loadWordsFromCloudRealtime = loadWordsFromCloudRealtime;
+window.deleteWordFromCloud = deleteWordFromCloud;
+window.syncAllWordsToCloud = syncAllWordsToCloud;
 
-// ═══════════════════════════════════════════════════════════════
-// エクスポート（必要に応じて）
-// ═══════════════════════════════════════════════════════════════
+Object.defineProperty(window, 'currentUser', {
+  get: () => currentUser,
+  set: (value) => { currentUser = value; }
+});
 
-// 使用例：
-// await loginWithGoogle();
-// const unsubscribe = loadWordsFromCloudRealtime(currentUser.uid, (words) => {
-//   console.log('単語データ更新:', words);
-// });
-// await saveWordToCloud(currentUser.uid, { id: 1, en: 'apple', jp: 'りんご' });
-// const words = await loadWordsFromCloud(currentUser.uid);
+console.log('✅ firebase-integration.js 読み込み完了');
