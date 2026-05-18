@@ -777,21 +777,35 @@ async function init() {
 }
 
 // ─── ログイン管理 ────────────────────────────────────────
+// ─── ログイン管理（ここをFirebase用に丸ごと置き換え） ───────────
 function checkAuthStatus() {
-  const authData = localStorage.getItem(AUTH_KEY);
-  if (authData) {
-    try {
-      const auth = JSON.parse(authData);
-      isGuest = auth.isGuest;
-      if (!isGuest && auth.googleUser) {
-        googleUser = auth.googleUser;
+  // firebase-integration.js で作った本物の監視ツールを呼び出します
+  if (typeof onAuthStateChangedListener === 'function') {
+    onAuthStateChangedListener((user) => {
+      if (user) {
+        // Firebaseでログイン成功している場合
+        isGuest = false;
+        googleUser = user;
+        playerId = user.uid; // FirebaseのユーザーIDをそのまま使用
+        playerName = user.displayName || 'ユーザー';
+        
+        // ニックネーム履歴に保存
+        if (!playerNameHistory.includes(playerName)) {
+          playerNameHistory.push(playerName);
+        }
+        
+        // ローカルストレージを同期
+        saveStorage();
+        showApp();
+      } else {
+        // ログインしていない場合
+        showLoginScreen();
       }
-      showApp();
-      return;
-    } catch (e) {}
+    });
+  } else {
+    // スクリプトがまだ読み込まれていない場合のバックアップ
+    showLoginScreen();
   }
-  showLoginScreen();
-  initializeGoogleSignIn();
 }
 
 function showLoginScreen() {
@@ -836,17 +850,14 @@ function initializeGoogleSignIn() {
 }
 
 function demoGoogleLogin() {
-  const name = prompt('デモ: ログイン名を入力してください (例: Taro)');
-  if (name) {
-    googleUser = {
-      id: 'demo_' + Date.now(),
-      email: name + '@demo.local',
-      name: name,
-      picture: 'https://lh3.googleusercontent.com/a/default-user'
-    };
-    isGuest = false;
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: false, googleUser }));
-    showApp();
+  // ボタンからここが呼ばれても自動的にFirebaseのログインが走るようにします
+  if (typeof loginWithGoogle === 'function') {
+    loginWithGoogle().catch(err => {
+      console.error("Firebase Login Error:", err);
+      alert("ログインに失敗しました: " + err.message);
+    });
+  } else {
+    alert("Firebaseスクリプトの読み込みが間に合っていません。ページを再読み込みしてください。");
   }
 }
 
