@@ -96,8 +96,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* 覚えた単語復習ボタン */
 .btn-learned { background: linear-gradient(135deg,#1b5e20,#2e7d32); color:white; }
 .btn-learned:hover { background: linear-gradient(135deg,#145214,#1b5e20); }
+/* ログイン画面 */
+.login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.login-box { background: white; border-radius: 16px; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center; }
+.login-title { font-size: 24px; font-weight: 700; margin-bottom: 1rem; color: #1a1a1a; }
+.login-subtitle { font-size: 13px; color: #666; margin-bottom: 2rem; line-height: 1.6; }
+.login-buttons { display: flex; flex-direction: column; gap: 12px; }
+.login-btn { width: 100%; padding: 13px; border: none; border-radius: 10px; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.15s; font-family: inherit; }
+.login-btn-google { background: white; color: #1a1a1a; border: 2px solid #e0e0da; }
+.login-btn-google:hover { border-color: #2D7DD2; background: #f0f7ff; }
+.login-btn-guest { background: #2D7DD2; color: white; }
+.login-btn-guest:hover { background: #2266b3; }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
+<body>
+
+<!-- ログイン画面 -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-title">単語復習アプリ</div>
+    <div class="login-subtitle">Googleアカウントでログインするか、ゲストとして使用してください。ランキング機能はログインが必要です。</div>
+    <div class="login-buttons">
+      <button class="login-btn login-btn-google" id="google-signin-button" onclick="demoGoogleLogin()">🔐 Googleでログイン</button>
+      <button class="login-btn login-btn-guest" onclick="loginAsGuest()">👤 ゲストで使用</button>
+    </div>
+    <div style="font-size: 11px; color: #aaa; margin-top: 1.5rem;">ログイン情報はローカルに保存されます</div>
+  </div>
+</div>
+
+<div id="app-container" style="display: none;">
+
 <body>
 
 <!-- テスト日設定モーダル -->
@@ -245,6 +274,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <!-- ══ HOME ══════════════════════════════════════════ -->
   <div class="screen visible" id="screen-home">
+    <!-- ユーザー情報 & ログアウト -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;font-size:12px;">
+      <div style="color:#666;">
+        <span id="user-info"></span>
+      </div>
+      <button class="exit-btn" onclick="logout()" style="color:#2D7DD2;border-color:#2D7DD2;">🔓 ログアウト</button>
+    </div>
     <!-- カウントダウン -->
     <div class="countdown-card" id="countdown-card">
       <div class="countdown-label" id="countdown-label">テスト日を設定してください</div>
@@ -262,7 +298,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" onchange="updatePlayerName()" onkeydown="if(event.key==='Enter'){ updatePlayerName(); this.blur(); }">
       <div style="font-size:12px;color:#666;margin-top:6px;">クイズを始める前に名前を入力すると、成績がランキングに保存されます。</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:1rem;">
+    <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:0.8rem;">
       <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 ランキングを見る</button>
     </div>
     <div class="card" style="margin-bottom:1.25rem;">
@@ -568,7 +604,10 @@ const DB_VERSION = 1;
 const WORD_STORE = 'words';
 const LS_KEY = 'vocab_app_v3';
 const RANKING_KEY = 'vocab_leaderboard';
+const AUTH_KEY = 'vocab_app_auth';
 
+let isGuest = false;
+let googleUser = null;
 let playerId = '';
 let playerName = '';
 let playerNameHistory = [];
@@ -607,13 +646,17 @@ function normalizeLeaderboard() {
       const mergedEntry = {
         playerId: playerId,
         name: playerName || entry.name,
-        correct: entry.correct || 0,
-        total: entry.total || 0,
+        learned: entry.learned || 0,
+        totalAnswers: entry.totalAnswers || 0,
+        totalCorrect: entry.totalCorrect || 0,
+        accuracy: entry.accuracy || 0,
         date: entry.date || new Date().toISOString(),
       };
       if (current) {
-        mergedEntry.correct = current.correct + mergedEntry.correct;
-        mergedEntry.total = current.total + mergedEntry.total;
+        mergedEntry.learned = Math.max(current.learned, mergedEntry.learned);
+        mergedEntry.totalAnswers = current.totalAnswers + mergedEntry.totalAnswers;
+        mergedEntry.totalCorrect = current.totalCorrect + mergedEntry.totalCorrect;
+        mergedEntry.accuracy = mergedEntry.totalAnswers > 0 ? Math.round((mergedEntry.totalCorrect / mergedEntry.totalAnswers) * 100) : 0;
         mergedEntry.date = current.date > mergedEntry.date ? current.date : mergedEntry.date;
         mergedEntry.name = playerName || current.name || mergedEntry.name;
       }
@@ -624,7 +667,6 @@ function normalizeLeaderboard() {
   });
   if (merged.size) {
     merged.forEach(entry => {
-      entry.pct = entry.total > 0 ? Math.round((entry.correct / entry.total) * 100) : 0;
       normalized.push(entry);
     });
   }
@@ -710,7 +752,7 @@ const state = {
   frDir: 'jp-en',
   reviewScoreMode: 'ai',
   queue: [], current: 0, results: [],
-  isReviewMode: false, isFriendMode: false,
+  isReviewMode: false, isFriendMode: false, isLearnedReviewMode: false,
   learnedCount: 0, sessions: 0
 };
 let resultShowing = false;
@@ -731,6 +773,119 @@ async function init() {
   normalizeLeaderboard();
   const nameInput = document.getElementById('player-name');
   if (nameInput) nameInput.value = playerName;
+}
+
+// ─── ログイン管理 ────────────────────────────────────────
+function checkAuthStatus() {
+  const authData = localStorage.getItem(AUTH_KEY);
+  if (authData) {
+    try {
+      const auth = JSON.parse(authData);
+      isGuest = auth.isGuest;
+      if (!isGuest && auth.googleUser) {
+        googleUser = auth.googleUser;
+      }
+      showApp();
+      return;
+    } catch (e) {}
+  }
+  showLoginScreen();
+  initializeGoogleSignIn();
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app-container').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-container').style.display = 'block';
+  initApp();
+}
+
+function loginAsGuest() {
+  isGuest = true;
+  localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: true, googleUser: null }));
+  showApp();
+}
+
+function initializeGoogleSignIn() {
+  if (!window.google || !google.accounts) {
+    console.warn('Google Sign-In script not loaded. Using demo mode.');
+    return;
+  }
+  const clientId = 'YOUR_GOOGLE_CLIENT_ID_HERE';
+  if (clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+    console.warn('Google Client ID not configured. Using demo mode.');
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: clientId,
+    callback: handleGoogleSignIn
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('google-signin-button'),
+    { 
+      theme: 'outline', 
+      size: 'large',
+      text: 'signin'
+    }
+  );
+}
+
+function demoGoogleLogin() {
+  const name = prompt('デモ: ログイン名を入力してください (例: Taro)');
+  if (name) {
+    googleUser = {
+      id: 'demo_' + Date.now(),
+      email: name + '@demo.local',
+      name: name,
+      picture: 'https://lh3.googleusercontent.com/a/default-user'
+    };
+    isGuest = false;
+    localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: false, googleUser }));
+    showApp();
+  }
+}
+
+function handleGoogleSignIn(response) {
+  if (response.credential) {
+    try {
+      const decoded = parseJwt(response.credential);
+      googleUser = {
+        id: decoded.sub,
+        email: decoded.email,
+        name: decoded.name,
+        picture: decoded.picture
+      };
+      isGuest = false;
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: false, googleUser }));
+      showApp();
+    } catch (e) {
+      console.error('Failed to parse Google token:', e);
+      alert('ログインに失敗しました');
+    }
+  }
+}
+
+function parseJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+  return JSON.parse(jsonPayload);
+}
+
+function logout() {
+  isGuest = false;
+  googleUser = null;
+  localStorage.removeItem(AUTH_KEY);
+  showLoginScreen();
+  if (window.google && google.accounts) {
+    google.accounts.id.disableAutoSelect();
+  }
 }
 
 async function initApp() {
@@ -1029,7 +1184,7 @@ function finishQuiz(isExit){
   const correct=state.results.filter(r=>r.grade==='correct').length;
   const partial=state.results.filter(r=>r.grade==='partial').length;
   const wrong=state.results.filter(r=>r.grade==='wrong').length;
-  state.learnedCount+=correct;
+  if(!state.isLearnedReviewMode) state.learnedCount+=correct;
   if(state.isReviewMode){
     const ck=new Set(state.results.filter(r=>r.grade==='correct').map(r=>skey(r.word.id,r.dir)));
     reviewWords=reviewWords.filter(rw=>!ck.has(skey(rw.word.id,rw.dir)));
@@ -1040,7 +1195,7 @@ function finishQuiz(isExit){
   });
   saveStorage(); updateStats();
   const total=state.results.length;
-  if (playerName) {
+  if (playerName && !isGuest) {
     addLeaderboardEntry(playerName, correct, total);
   }
   if(isExit){showScreen('screen-home');return;}
@@ -1086,6 +1241,16 @@ function removeReview(i){reviewWords.splice(i,1);saveStorage();updateStats();ren
 
 // ─── 統計・進捗（3色バー） ───────────────────────────────
 function updateStats(){
+  // ユーザー情報を更新
+  const userInfoEl = document.getElementById('user-info');
+  if (userInfoEl) {
+    if (isGuest) {
+      userInfoEl.textContent = '👤 ゲストユーザー';
+    } else if (googleUser) {
+      userInfoEl.textContent = `👤 ${googleUser.name || googleUser.email}`;
+    }
+  }
+  
   document.getElementById('stat-total').textContent=state.learnedCount;
   document.getElementById('stat-sessions').textContent=state.sessions;
   const n=reviewWords.length;
@@ -1095,10 +1260,10 @@ function updateStats(){
   const summaryEl = document.getElementById('leaderboard-summary');
   if (summaryEl) {
     if (!leaderboard.length) {
-      summaryEl.textContent = 'ランキングはまだありません。名前を入力して結果を残そう。';
+      summaryEl.textContent = isGuest ? 'ランキングを表示するにはGoogleでログインしてください。' : 'ランキングはまだありません。名前を入力して結果を残そう。';
     } else {
       summaryEl.innerHTML = leaderboard.slice(0,3).map((entry, i) =>
-        `<div style="margin-bottom:6px;">${i+1}. ${entry.name} — ${entry.pct}% (${entry.correct}/${entry.total})</div>`
+        `<div style="margin-bottom:6px;">${i+1}. ${entry.name} — ${entry.learned}語覚えた (${entry.accuracy}%)</div>`
       ).join('');
     }
   }
@@ -1206,38 +1371,53 @@ function submitPlayerNameModal(){
   closeNameModal();
 }
 
+function getTotalStats() {
+  let totalAnswers = 0;
+  let totalCorrect = 0;
+  Object.values(wordStats).forEach(stat => {
+    if (stat.attempts) {
+      totalAnswers += stat.attempts;
+      totalCorrect += (stat.attempts - (stat.misses || 0));
+    }
+  });
+  return { totalAnswers, totalCorrect };
+}
+
 function addLeaderboardEntry(name, correct, total){
-  if(!name || total <= 0) return;
+  if(!name) return;
   ensurePlayerId();
   normalizeLeaderboard();
   const normalizedName = name.trim().slice(0, 20) || '名無し';
-  const pct = Math.round((correct/total)*100);
+  const { totalAnswers, totalCorrect } = getTotalStats();
+  const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+  
   const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
   if (existingIndex !== -1) {
     const existing = leaderboard[existingIndex];
-    const merged = {
+    leaderboard[existingIndex] = {
       playerId,
       name: normalizedName,
-      correct: (existing.correct || 0) + correct,
-      total: (existing.total || 0) + total,
+      learned: state.learnedCount,
+      totalAnswers,
+      totalCorrect,
+      accuracy,
       date: new Date().toISOString()
     };
-    merged.pct = Math.round((merged.correct/merged.total)*100);
-    leaderboard[existingIndex] = merged;
   } else {
     leaderboard = [...leaderboard, {
       playerId,
       name: normalizedName,
-      correct,
-      total,
-      pct,
+      learned: state.learnedCount,
+      totalAnswers,
+      totalCorrect,
+      accuracy,
       date: new Date().toISOString()
     }];
   }
   normalizeLeaderboard();
   leaderboard = leaderboard.sort((a,b)=>{
-    if(b.correct !== a.correct) return b.correct - a.correct;
-    if(b.pct !== a.pct) return b.pct - a.pct;
+    if(b.learned !== a.learned) return b.learned - a.learned;
+    if(b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
     return new Date(b.date) - new Date(a.date);
   }).slice(0, 10);
   saveStorage();
@@ -1245,6 +1425,7 @@ function addLeaderboardEntry(name, correct, total){
 }
 
 function openLeaderboardModal(){
+  if(isGuest){ alert('ランキング機能を使用するにはGoogleアカウントでログインしてください。'); return; }
   if(!playerName){ alert('ランキングを見るにはまず名前を入力してください。'); return; }
   renderLeaderboard();
   document.getElementById('leaderboard-modal').classList.add('open');
@@ -1330,10 +1511,11 @@ function renderLeaderboard(){
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
         <div style="min-width:0;flex:1;">
           <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">${i+1}. ${entry.name}</div>
-          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel} · ${entry.correct}/${entry.total}問</div>
+          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel}</div>
+          <div class="review-jp" style="font-size:12px;color:#666;margin-top:2px;">覚えた: ${entry.learned || 0}語 | 答えた: ${entry.totalAnswers || 0}問 | 正解率: ${entry.accuracy || 0}%</div>
         </div>
         <div style="text-align:center;">
-          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;">${entry.correct}</span>
+          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;">${entry.learned || 0}</span>
           <div style="font-size:11px;color:#888;margin-top:2px;">覚えた</div>
         </div>
       </div>
@@ -1341,7 +1523,7 @@ function renderLeaderboard(){
   }).join('');
 }
 
-initApp();
+checkAuthStatus();
 
 // ─── テスト日 ────────────────────────────────────────────────
 let testDate = null; // Date object
@@ -1525,7 +1707,7 @@ function startLearnedReview(){
   });
   if(!learnedWords.length){alert('まだ覚えた単語がありません');return;}
   state.queue=shuffle(learnedWords).map(w=>({word:w,dir:lrDir}));
-  state.current=0;state.results=[];state.isReviewMode=false;state.isFriendMode=false;
+  state.current=0;state.results=[];state.isReviewMode=false;state.isFriendMode=false;state.isLearnedReviewMode=true;
   state.scoreMode='ai';
   showScreen('screen-quiz');renderQuestion();
 }
