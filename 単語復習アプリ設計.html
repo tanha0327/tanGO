@@ -120,7 +120,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="login-subtitle">Googleアカウントでログインするか、ゲストとして使用してください。ランキング機能はログインが必要です。</div>
     <div class="login-buttons">
       <!-- ＝ 修正後 ＝ -->
-<button class="login-btn login-btn-google" id="google-signin-button" onclick="import('./firebase-integration.js').then(m => m.loginWithGoogle())">🔐 Googleでログイン</button>
+<button class="login-btn login-btn-google" id="google-signin-button" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
       <button class="login-btn login-btn-guest" onclick="loginAsGuest()">👤 ゲストで使用</button>
     </div>
     <div style="font-size: 11px; color: #aaa; margin-top: 1.5rem;">ログイン情報はローカルに保存されます</div>
