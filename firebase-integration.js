@@ -256,6 +256,11 @@ async function syncAllWordsToCloud(uid, localWordStats) {
   }
 }
 
+// HTMLのボタン(onclick)から直接呼び出せるように、窓口を完全に開放します
+window.loginWithGoogle = loginWithGoogle;
+window.logout = logout;
+window.onAuthStateChangedListener = onAuthStateChangedListener;
+
 // ═══════════════════════════════════════════════════════════════
 // エクスポート（必要に応じて）
 // ═══════════════════════════════════════════════════════════════
