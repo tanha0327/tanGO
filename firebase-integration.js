@@ -3,12 +3,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
+  authDomain: "tango-c36c0.firebaseapp.com",
+  projectId: "tango-c36c0",
+  storageBucket: "tango-c36c0.firebasestorage.app",
+  messagingSenderId: "585521402157",
+  appId: "1:585521402157:web:c35c6d8dae4bea057c03a4",
+  measurementId: "G-1FY7HZ1JLE"
 };
 
 // Firebase を初期化
