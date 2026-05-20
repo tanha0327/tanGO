@@ -11,7 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-firestore.js"></script>
 
 <!-- Firebase Integration (Firebase SDK の後に読み込むこと) -->
-<script src="firebase-integration.js?v=4"></script>
+<script src="firebase-integration.js?v=5"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
@@ -767,9 +767,14 @@ const state = {
 let resultShowing = false;
 
 async function init() {
+  console.log('📚 init() 実行開始');
   ALL_WORDS = await ensureWordsDatabase();
+  console.log(`✅ ALL_WORDS 読み込み: ${ALL_WORDS.length}語`);
   const s = loadStorage();
-  if (!s) return;
+  if (!s) {
+    console.log('⚠️  localStorage が見つかりません');
+    return;
+  }
   if (s.wordStats)    wordStats = s.wordStats;
   if (s.reviewWords)  reviewWords = s.reviewWords.map(rw => ({ word: ALL_WORDS.find(w => w.id === rw.word.id) || rw.word, dir: rw.dir }));
   if (s.learnedCount) state.learnedCount = s.learnedCount;
@@ -782,6 +787,7 @@ async function init() {
   normalizeLeaderboard();
   const nameInput = document.getElementById('player-name');
   if (nameInput) nameInput.value = playerName;
+  console.log('✅ init() 完了');
 }
 
 // ─── ログイン管理 ────────────────────────────────────────
@@ -824,12 +830,15 @@ function showLoginScreen() {
 }
 
 function showApp() {
+  console.log('🎯 アプリ表示開始');
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
+  console.log('🎯 initApp() 呼び出し中...');
   initApp();
 }
 
 function loginAsGuest() {
+  console.log('👤 ゲストモード開始');
   isGuest = true;
   localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: true, googleUser: null }));
   showApp();
@@ -911,13 +920,20 @@ function logout() {
 }
 
 async function initApp() {
-  await init();
-  updateStats();
-  updateLeaderboardAccess();
-  updateRangeSliders();
-  initSwipeDetection();
-  if (!playerName) openNameModal();
-  startCountdown();
+  console.log('📱 initApp() 実行開始');
+  try {
+    await init();
+    console.log('✅ init() 完了');
+    updateStats();
+    updateLeaderboardAccess();
+    updateRangeSliders();
+    initSwipeDetection();
+    if (!playerName) openNameModal();
+    startCountdown();
+    console.log('✅ initApp() 完了');
+  } catch (error) {
+    console.error('❌ initApp() エラー:', error);
+  }
 }
 
 // ─── ユーティリティ ──────────────────────────────────────
@@ -1546,6 +1562,7 @@ function renderLeaderboard(){
 }
 
 // firebase-integration.js が読み込まれ、Firebase SDK が利用可能になるまで待機
+// 方法1: window.load イベント
 window.addEventListener('load', async () => {
   console.log('📄 Window load イベント発火');
   const hasInitFunc = typeof initializeFirebase === 'function';
@@ -1567,6 +1584,14 @@ window.addEventListener('load', async () => {
   console.log('✅ checkAuthStatus() 呼び出し中...');
   checkAuthStatus();
 });
+
+// 方法2: スクリプト読み込み後すぐに実行（window.load より先に実行される可能性がある）
+setTimeout(async () => {
+  console.log('⏱️  500ms 後の checkAuthStatus 呼び出し');
+  if (typeof checkAuthStatus === 'function') {
+    checkAuthStatus();
+  }
+}, 500);
 
 // ─── テスト日 ────────────────────────────────────────────────
 let testDate = null; // Date object

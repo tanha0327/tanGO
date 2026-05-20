@@ -315,3 +315,6 @@ Object.defineProperty(window, 'currentUser', {
 });
 
 console.log('✅ firebase-integration.js 読み込み完了');
+console.log('  - initializeFirebase: ', typeof window.initializeFirebase);
+console.log('  - loginWithGoogle: ', typeof window.loginWithGoogle);
+console.log('  - onAuthStateChangedListener: ', typeof window.onAuthStateChangedListener);
