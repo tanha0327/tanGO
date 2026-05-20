@@ -78,7 +78,12 @@ async function initializeFirebase() {
 async function loginWithGoogle() {
   try {
     const initialized = await initializeFirebase();
-    if (!initialized) throw new Error('Firebase 初期化失敗');
+    if (!initialized) {
+      const msg = '❌ Firebase が利用できません。ゲストモードでご利用ください。\n（実ブラウザで確認してください）';
+      console.error(msg);
+      alert(msg);
+      throw new Error('Firebase 初期化失敗');
+    }
 
     const provider = new firebase.auth.GoogleAuthProvider();
     const result = await auth.signInWithPopup(provider);

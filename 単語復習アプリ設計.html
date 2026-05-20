@@ -788,7 +788,7 @@ async function init() {
 // ─── ログイン管理（ここをFirebase用に丸ごと置き換え） ───────────
 function checkAuthStatus() {
   // firebase-integration.js で作った本物の監視ツールを呼び出します
-  console.log('🔍 checkAuthStatus() 実行', typeof onAuthStateChangedListener, typeof initializeFirebase);
+  console.log('🔍 checkAuthStatus() 実行');
   if (typeof onAuthStateChangedListener === 'function') {
     onAuthStateChangedListener((user) => {
       if (user) {
@@ -812,7 +812,8 @@ function checkAuthStatus() {
       }
     });
   } else {
-    // スクリプトがまだ読み込まれていない場合のバックアップ
+    // Firebase が利用できない場合もログイン画面を表示
+    console.log('ℹ️  Firebase 利用不可（ゲストモードのみ可能）');
     showLoginScreen();
   }
 }
@@ -1551,15 +1552,20 @@ window.addEventListener('load', async () => {
   console.log(`Firebase 準備状態: initializeFirebase=${hasInitFunc}, firebase=${typeof window.firebase}`);
   
   if (hasInitFunc) {
-    // Firebase を初期化
+    // Firebase を初期化（失敗してもゲストモードで続行）
     console.log('🚀 Firebase 初期化開始...');
-    await initializeFirebase();
-    // その後で checkAuthStatus を呼び出す
-    console.log('✅ checkAuthStatus() 呼び出し中...');
-    checkAuthStatus();
+    try {
+      await initializeFirebase();
+    } catch (error) {
+      console.error('Firebase 初期化エラー（ゲストモードで続行）:', error);
+    }
   } else {
-    console.warn('⚠️ firebase-integration.js がまだ読み込まれていません');
+    console.warn('⚠️ firebase-integration.js がまだ読み込まれていません（ゲストモードのみ）');
   }
+  
+  // Firebase の結果に関わらず、認証状態をチェック
+  console.log('✅ checkAuthStatus() 呼び出し中...');
+  checkAuthStatus();
 });
 
 // ─── テスト日 ────────────────────────────────────────────────
