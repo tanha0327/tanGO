@@ -3,6 +3,18 @@
 // 【1】Firebase初期設定 【2】Google認証 【3】Firestore操作
 // ═══════════════════════════════════════════════════════════════
 
+// 診断ログ
+console.log('✅ firebase-integration.js 読み込み開始');
+console.log('Firebase オブジェクト存在:', typeof window.firebase !== 'undefined');
+console.log('firebase.apps:', typeof window.firebase !== 'undefined' ? window.firebase.apps.length : 'N/A');
+
+// 追加の診断
+setTimeout(() => {
+  console.log('=== 5秒後の診断 ===');
+  console.log('firebase:', typeof window.firebase);
+  console.log('firebase.apps.length:', typeof window.firebase !== 'undefined' ? window.firebase.apps.length : 'N/A');
+}, 5000);
+
 const firebaseConfig = {
   apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
   authDomain: "tango-c36c0.firebaseapp.com",
@@ -23,23 +35,31 @@ let currentUser = null;
 async function initializeFirebase() {
   // 既に初期化済みならスキップ
   if (auth !== null && db !== null) {
+    console.log('✅ Firebase 既に初期化済み（スキップ）');
     return true;
   }
 
-  // Firebase SDK が読み込まれるまで待機（最大 10秒）
+  // Firebase SDK が読み込まれるまで待機（最大 20秒）
+  console.log('⏳ Firebase SDK の読み込みを待機中...');
   let attempts = 0;
-  while (typeof firebase === 'undefined' && attempts < 100) {
+  const maxAttempts = 200; // 20秒
+  while (typeof firebase === 'undefined' && attempts < maxAttempts) {
+    console.log(`  [${attempts + 1}/${maxAttempts}] firebase: ${typeof firebase}`);
     await new Promise(resolve => setTimeout(resolve, 100));
     attempts++;
   }
 
   if (typeof firebase === 'undefined') {
-    console.error('❌ Firebase SDK が読み込まれていません（タイムアウト）');
+    console.error('❌ Firebase SDK が読み込まれていません（タイムアウト後 20秒）');
+    console.error('   ページを再読み込みしてください');
     return false;
   }
 
+  console.log(`✅ Firebase SDK 検出！（${attempts * 100}ms後）`);
+  
   try {
     if (firebase.apps.length === 0) {
+      console.log('🚀 firebase.initializeApp() 実行中...');
       firebase.initializeApp(firebaseConfig);
     }
     auth = firebase.auth();

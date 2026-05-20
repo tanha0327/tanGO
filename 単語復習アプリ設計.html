@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>単語復習アプリ</title>
 
-<!-- Firebase SDK (必須: firebase-integration.js より前に読み込むこと) -->
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+<!-- Firebase SDK compat バージョン (必須: firebase-integration.js より前に読み込むこと) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-firestore.js"></script>
 
 <!-- Firebase Integration (Firebase SDK の後に読み込むこと) -->
-<script src="firebase-integration.js?v=2"></script>
+<script src="firebase-integration.js?v=4"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
@@ -788,6 +788,7 @@ async function init() {
 // ─── ログイン管理（ここをFirebase用に丸ごと置き換え） ───────────
 function checkAuthStatus() {
   // firebase-integration.js で作った本物の監視ツールを呼び出します
+  console.log('🔍 checkAuthStatus() 実行', typeof onAuthStateChangedListener, typeof initializeFirebase);
   if (typeof onAuthStateChangedListener === 'function') {
     onAuthStateChangedListener((user) => {
       if (user) {
@@ -1543,17 +1544,23 @@ function renderLeaderboard(){
   }).join('');
 }
 
-// firebase-integration.js が読み込まれるまで待機
-setTimeout(async () => {
-  if (typeof initializeFirebase === 'function') {
+// firebase-integration.js が読み込まれ、Firebase SDK が利用可能になるまで待機
+window.addEventListener('load', async () => {
+  console.log('📄 Window load イベント発火');
+  const hasInitFunc = typeof initializeFirebase === 'function';
+  console.log(`Firebase 準備状態: initializeFirebase=${hasInitFunc}, firebase=${typeof window.firebase}`);
+  
+  if (hasInitFunc) {
     // Firebase を初期化
+    console.log('🚀 Firebase 初期化開始...');
     await initializeFirebase();
     // その後で checkAuthStatus を呼び出す
+    console.log('✅ checkAuthStatus() 呼び出し中...');
     checkAuthStatus();
   } else {
     console.warn('⚠️ firebase-integration.js がまだ読み込まれていません');
   }
-}, 300);
+});
 
 // ─── テスト日 ────────────────────────────────────────────────
 let testDate = null; // Date object
