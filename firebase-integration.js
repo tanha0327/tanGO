@@ -39,19 +39,17 @@ async function initializeFirebase() {
     return true;
   }
 
-  // Firebase SDK が読み込まれるまで待機（最大 20秒）
+  // Firebase SDK が読み込まれるまで待機（最大 3秒 - 短縮）
   console.log('⏳ Firebase SDK の読み込みを待機中...');
   let attempts = 0;
-  const maxAttempts = 200; // 20秒
+  const maxAttempts = 30; // 3秒（100ms × 30）
   while (typeof firebase === 'undefined' && attempts < maxAttempts) {
-    console.log(`  [${attempts + 1}/${maxAttempts}] firebase: ${typeof firebase}`);
     await new Promise(resolve => setTimeout(resolve, 100));
     attempts++;
   }
 
   if (typeof firebase === 'undefined') {
-    console.error('❌ Firebase SDK が読み込まれていません（タイムアウト後 20秒）');
-    console.error('   ページを再読み込みしてください');
+    console.warn('⚠️  Firebase SDK が利用できません（ゲストモードで続行）');
     return false;
   }
 
