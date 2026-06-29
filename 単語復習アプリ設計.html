@@ -1501,42 +1501,42 @@ function getTotalStats() {
   return { totalAnswers, totalCorrect };
 }
 
-function addLeaderboardEntry(name, correct, total){
+// 【修正版】ランキングデータをローカルとクラウドの両方に保存する
+function addLeaderboardEntry(name, correct, total) {
   if(!name) return;
   ensurePlayerId();
   normalizeLeaderboard();
+  
   const normalizedName = name.trim().slice(0, 20) || '名無し';
   const { totalAnswers, totalCorrect } = getTotalStats();
   const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
   
-  const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
-  if (existingIndex !== -1) {
-    leaderboard[existingIndex] = {
-      playerId,
-      name: normalizedName,
+  // クラウド（Firebase）へスコアを送信
+  if (!isGuest && typeof saveScoreToLeaderboard === 'function') {
+    saveScoreToLeaderboard({
       learned: state.learnedCount,
-      totalAnswers,
-      totalCorrect,
-      accuracy,
-      date: new Date().toISOString()
-    };
-  } else {
-    leaderboard = [...leaderboard, {
-      playerId,
-      name: normalizedName,
-      learned: state.learnedCount,
-      totalAnswers,
-      totalCorrect,
-      accuracy,
-      date: new Date().toISOString()
-    }];
+      totalAnswers: totalAnswers,
+      accuracy: accuracy
+    });
   }
+
+  // ローカルのランキングも更新（オフライン用）
+  const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
+  const newEntry = {
+    playerId, name: normalizedName,
+    learned: state.learnedCount,
+    totalAnswers, totalCorrect, accuracy,
+    date: new Date().toISOString()
+  };
+  
+  if (existingIndex !== -1) {
+    leaderboard[existingIndex] = newEntry;
+  } else {
+    leaderboard.push(newEntry);
+  }
+  
   normalizeLeaderboard();
-  leaderboard = leaderboard.sort((a,b)=>{
-    if(b.learned !== a.learned) return b.learned - a.learned;
-    if(b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
-    return new Date(b.date) - new Date(a.date);
-  }).slice(0, 10);
+  leaderboard = leaderboard.sort((a,b)=> b.learned - a.learned || b.accuracy - a.accuracy).slice(0, 10);
   saveStorage();
   updateStats();
 }
