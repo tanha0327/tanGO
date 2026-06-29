@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 
-<script src="firebase-integration.js?v=6"></script>
+<script src="firebase-integration.js?v=7"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
@@ -238,11 +238,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="modal-overlay" id="leaderboard-modal">
   <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-      <div class="modal-title" style="margin:0;">🏆 ランキング</div>
+      <div class="modal-title" style="margin:0;">🏆 全体ランキング</div>
       <button onclick="closeLeaderboardModal()" style="border:none;background:none;font-size:24px;cursor:pointer;color:#aaa;line-height:1;">×</button>
     </div>
     <div id="leaderboard-content"></div>
-    <div style="font-size:12px;color:#888;margin-top:10px;">名前を入力しておくと、成績がランキングに反映されます。</div>
+    <div style="font-size:12px;color:#888;margin-top:10px;text-align:center;">クイズを完了すると最新のスコアが反映されます。</div>
   </div>
 </div>
 
@@ -286,6 +286,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <button class="exit-btn" onclick="logout()" style="color:#2D7DD2;border-color:#2D7DD2;">🔓 ログアウト</button>
     </div>
+    
     <div class="countdown-card" id="countdown-card">
       <div class="countdown-label" id="countdown-label">テスト日を設定してください</div>
       <div class="countdown-days" id="countdown-days">--</div>
@@ -297,18 +298,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <button class="test-date-btn" onclick="shareTestDate()">📤 テスト日を共有</button>
       </div>
     </div>
+    
     <div class="card" style="margin-bottom:1rem;">
       <div class="label">名前（ランキング表示用）</div>
       <input type="text" id="player-name" class="text-input" placeholder="ニックネームを入力してください" onchange="updatePlayerName()" onkeydown="if(event.key==='Enter'){ updatePlayerName(); this.blur(); }">
-      <div style="font-size:12px;color:#666;margin-top:6px;">クイズを始める前に名前を入力すると、成績がランキングに保存されます。</div>
     </div>
+    
     <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:0.8rem;">
-      <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 ランキングを見る</button>
+      <button class="big-btn btn-secondary" id="btn-open-leaderboard" onclick="openLeaderboardModal()" disabled>🏆 もっとランキングを見る</button>
     </div>
+    
     <div class="card" style="margin-bottom:1.25rem;">
-      <div class="label">ランキングトップ</div>
-      <div id="leaderboard-summary" style="font-size:13px;color:#555;line-height:1.6;min-height:70px;">名前を入力するとランキングが見られます。</div>
+      <div class="label" style="margin-bottom:10px;">👑 全体ランキングトップ3</div>
+      <div id="leaderboard-summary" style="font-size:13px;color:#555;line-height:1.6;min-height:70px;">
+        </div>
     </div>
+    
     <div class="stat-grid">
       <div class="stat-card clickable" onclick="openLearnedReviewModal()" title="タップして覚えた単語を復習">
         <div class="stat-num" id="stat-total">0</div><div class="stat-lbl">覚えた単語 👆</div>
@@ -416,7 +421,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div id="quiz-hint" class="quiz-hint"></div>
       <input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力（空欄でも解答可）" onkeydown="if(event.key==='Enter'&&!resultShowing)submitAnswer()">
       <div id="quiz-result" style="display:none;"></div>
-      <div id="ai-loading" class="ai-loading" style="display:none;">🤖 AI採点中...</div>
     </div>
     <div style="position:relative;height:54px;margin-bottom:8px;">
       <button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()" style="margin:0;position:absolute;inset:0;width:100%;">解答する</button>
@@ -867,7 +871,6 @@ async function ensureWordsDatabase() {
   try {
     const db = await openDatabase();
     const existing = await getAllWordsFromDb(db);
-    // 新しい単語が追加されている場合はIndexedDBを自動更新するよう修正
     if (existing.length >= initialWords.length) return existing;
     await saveWordsToDb(db, initialWords);
     return initialWords;
@@ -1217,7 +1220,6 @@ function renderQuestion() {
   document.getElementById('quiz-answer').value='';
   document.getElementById('quiz-answer').disabled=false;
   document.getElementById('quiz-result').style.display='none';
-  document.getElementById('ai-loading').style.display='none';
   document.getElementById('btn-submit').style.display='block';
   document.getElementById('btn-next').style.display='none';
   setTimeout(()=>document.getElementById('quiz-answer').focus(),50);
@@ -1233,14 +1235,14 @@ async function submitAnswer() {
   document.getElementById('btn-submit').style.display='none';
   resultShowing=true;
   
-  // AIを完全にスキップして、直接ローカルの手動（自動）採点を実行
+  // 直接ローカルの手動（自動）採点を実行
   gradeManual(w, userAns, dir);
   
   document.getElementById('btn-submit').style.display='none';
   document.getElementById('btn-next').style.display='block';
 }
 
-// （エラー防止用のダミー関数）
+// ※ダミーのAI採点関数（すべてローカル採点へ回す）
 async function gradeAI(w,userAns,dir){
   gradeManual(w, userAns, dir);
 }
@@ -1259,24 +1261,6 @@ function gradeManual(w,userAns,dir){
   state.results.push({word:w,dir,grade,userAns});
   recordStat(w.id,dir,grade==='correct');
   showResultBox(grade,correct,userAns,null);
-}
-
-async function gradeAI(w,userAns,dir){
-  const correct=dir==='jp-en'?w.en:w.jp;
-  const question=dir==='jp-en'?w.jp:w.en;
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',max_tokens:300,
-      messages:[{role:'user',content:`英単語学習の採点をしてください。\n問題: "${question}"  模範解答: "${correct}"  受験者の解答: "${userAns||'（空欄）'}"\n採点基準: 意味・ニュアンスが実質的に合っていれば"correct"（例: bake→「焼く」は正解）、部分的なら"partial"、違う・空欄なら"wrong"\nJSONのみで返答: {"grade":"correct"|"partial"|"wrong","feedback":"日本語1文"}`}]
-    })});
-    const data=await res.json();
-    document.getElementById('ai-loading').style.display='none';
-    const text=(data.content||[]).map(i=>i.text||'').join('').replace(/```json|```/g,'').trim();
-    let parsed; try{parsed=JSON.parse(text);}catch{parsed={grade:'wrong',feedback:'採点エラー'};}
-    state.results.push({word:w,dir,grade:parsed.grade,userAns});
-    recordStat(w.id,dir,parsed.grade==='correct');
-    showResultBox(parsed.grade,correct,userAns,parsed.feedback);
-  }catch(e){document.getElementById('ai-loading').style.display='none'; gradeManual(w,userAns,dir); document.getElementById('btn-submit').style.display='none'; document.getElementById('btn-next').style.display='block';}
 }
 
 function showResultBox(grade,correct,userAns,feedback){
@@ -1325,9 +1309,11 @@ function finishQuiz(isExit){
   });
   saveStorage(); updateStats();
   const total=state.results.length;
+  
   if (playerName && !isGuest) {
     addLeaderboardEntry(playerName, correct, total);
   }
+  
   if(isExit){showScreen('screen-home');return;}
   const pct=Math.round((correct/total)*100);
   document.getElementById('result-emoji').textContent=pct>=80?'🎉':pct>=50?'💪':'📚';
@@ -1376,7 +1362,7 @@ function updateStats(){
     if (isGuest) {
       userInfoEl.textContent = '👤 ゲストユーザー';
     } else if (googleUser) {
-      userInfoEl.textContent = `👤 ${googleUser.name || googleUser.email}`;
+      userInfoEl.textContent = `👤 ${googleUser.displayName || googleUser.email}`;
     }
   }
   
@@ -1386,23 +1372,32 @@ function updateStats(){
   const rcEl=document.getElementById('stat-review-count');
   rcEl.textContent=n; rcEl.className='stat-num'+(n>0?' danger':'');
 
+  // ★ ホーム画面のランキングトップ表示
   const summaryEl = document.getElementById('leaderboard-summary');
   if (summaryEl) {
-    summaryEl.innerHTML = '<span style="color:#888;">☁️ 取得中...</span>';
-    // クラウドからトップ3だけを自動取得して表示
-    if (typeof getGlobalLeaderboardFromCloud === 'function') {
-      getGlobalLeaderboardFromCloud(3).then(board => {
+    if (!isGuest && typeof getGlobalLeaderboardFromCloud === 'function') {
+       summaryEl.innerHTML = '<div style="color:#888; font-size:12px; padding:10px;">☁️ クラウドから最新ランキングを取得中...</div>';
+       getGlobalLeaderboardFromCloud(3).then(board => {
         if (!board || board.length === 0) {
-          summaryEl.textContent = 'まだランキングがありません。一番乗りを目指しましょう！';
+          summaryEl.innerHTML = '<div style="color:#555; font-size:13px; padding:10px;">まだランキングがありません。一番乗りを目指しましょう！</div>';
         } else {
-          summaryEl.innerHTML = board.map((entry, i) =>
-            `<div style="margin-bottom:6px; font-weight:600;">
-              ${i===0?'👑':i===1?'🥈':'🥉'} ${i+1}. ${entry.displayName || entry.name} 
-              <span style="font-weight:normal; font-size:12px; color:#666;">— ${entry.learned}語 (${entry.accuracy}%)</span>
-            </div>`
-          ).join('');
+          summaryEl.innerHTML = board.map((entry, i) => {
+            const icon = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+            const isMe = entry.uid === (currentUser ? currentUser.uid : null);
+            const meBadge = isMe ? '<span style="font-size:10px;background:#1976d2;color:white;padding:2px 6px;border-radius:4px;margin-left:6px;">あなた</span>' : '';
+            return `<div style="margin-bottom:8px; font-weight:600; font-size:14px; background:${isMe ? '#e3f2fd' : 'transparent'}; padding: 4px; border-radius: 4px;">
+              ${icon} ${i+1}. ${entry.displayName || entry.name} ${meBadge}
+              <div style="font-weight:normal; font-size:12px; color:#666; margin-left:24px; margin-top:2px;">
+                覚えた: <strong style="color:#1976d2;">${entry.learned}語</strong> (答えた: ${entry.totalAnswers}問 / 正解率: ${entry.accuracy}%)
+              </div>
+            </div>`;
+          }).join('');
         }
+      }).catch(err => {
+        summaryEl.innerHTML = '<div style="color:#c62828; font-size:12px; padding:10px;">ランキングの取得に失敗しました。</div>';
       });
+    } else {
+       summaryEl.innerHTML = '<div style="color:#555; font-size:13px; padding:10px;">ログインすると全体のランキングトップが見られます。</div>';
     }
   }
 
@@ -1447,11 +1442,11 @@ function updatePlayerName(){
   updateLeaderboardAccess();
 }
 
+// 【修正版】ランキング上書きを完全に防ぐスッキリしたコード
 function updateLeaderboardAccess(){
   const enabled = Boolean(playerName);
   const openBtn = document.getElementById('btn-open-leaderboard');
   if(openBtn) openBtn.disabled = !enabled;
-  // ※ここにあった leaderboard-summary を上書きしてしまう邪魔なコードを削除しました！
 }
 
 function requirePlayerName(){
@@ -1514,12 +1509,10 @@ function getTotalStats() {
   return { totalAnswers, totalCorrect };
 }
 
-// 【修正版】ランキングデータをローカルとクラウドの両方に保存する
-function addLeaderboardEntry(name, correct, total) {
+function addLeaderboardEntry(name, correct, total){
   if(!name) return;
   ensurePlayerId();
   normalizeLeaderboard();
-  
   const normalizedName = name.trim().slice(0, 20) || '名無し';
   const { totalAnswers, totalCorrect } = getTotalStats();
   const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
@@ -1532,24 +1525,35 @@ function addLeaderboardEntry(name, correct, total) {
       accuracy: accuracy
     });
   }
-
-  // ローカルのランキングも更新（オフライン用）
+  
   const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
-  const newEntry = {
-    playerId, name: normalizedName,
-    learned: state.learnedCount,
-    totalAnswers, totalCorrect, accuracy,
-    date: new Date().toISOString()
-  };
-  
   if (existingIndex !== -1) {
-    leaderboard[existingIndex] = newEntry;
+    leaderboard[existingIndex] = {
+      playerId,
+      name: normalizedName,
+      learned: state.learnedCount,
+      totalAnswers,
+      totalCorrect,
+      accuracy,
+      date: new Date().toISOString()
+    };
   } else {
-    leaderboard.push(newEntry);
+    leaderboard = [...leaderboard, {
+      playerId,
+      name: normalizedName,
+      learned: state.learnedCount,
+      totalAnswers,
+      totalCorrect,
+      accuracy,
+      date: new Date().toISOString()
+    }];
   }
-  
   normalizeLeaderboard();
-  leaderboard = leaderboard.sort((a,b)=> b.learned - a.learned || b.accuracy - a.accuracy).slice(0, 10);
+  leaderboard = leaderboard.sort((a,b)=>{
+    if(b.learned !== a.learned) return b.learned - a.learned;
+    if(b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+    return new Date(b.date) - new Date(a.date);
+  }).slice(0, 10);
   saveStorage();
   updateStats();
 }
@@ -1572,6 +1576,48 @@ async function openLeaderboardModal() {
 }
 
 function closeLeaderboardModal(){ document.getElementById('leaderboard-modal').classList.remove('open'); }
+
+function renderLeaderboard(boardData = leaderboard) {
+  const el = document.getElementById('leaderboard-content');
+  if (!el) return;
+  if (!boardData || !boardData.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">まだランキングがありません。一番乗りを目指しましょう！</div>';
+    return;
+  }
+  
+  el.innerHTML = boardData.map((entry, i) => {
+    // メールアドレスを一部隠す処理（プライバシー配慮）
+    let emailDisplay = '';
+    if (entry.email) {
+      const parts = entry.email.split('@');
+      if(parts.length === 2) {
+         emailDisplay = `${parts[0].slice(0, 2)}***@${parts[1]}`;
+      }
+    }
+
+    const isMe = entry.uid === (currentUser ? currentUser.uid : null);
+    const bgColor = isMe ? '#e3f2fd' : '#f9f9f9'; // 自分のランクは青く光らせる
+
+    return `<div class="review-item" style="padding:12px;margin-bottom:10px;border:1px solid ${isMe ? '#90caf9' : '#e0e0e0'};border-radius:8px;background:${bgColor};">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="min-width:0;flex:1;">
+          <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">
+            ${i===0?'👑 ':i===1?'🥈 ':i===2?'🥉 ':''}${i+1}. ${entry.displayName || entry.name}
+            ${isMe ? '<span style="font-size:10px;background:#1976d2;color:white;padding:2px 6px;border-radius:4px;margin-left:6px;">あなた</span>' : ''}
+          </div>
+          ${emailDisplay ? `<div style="font-size:11px;color:#888;">✉️ ${emailDisplay}</div>` : ''}
+          <div class="review-jp" style="font-size:12px;color:#666;margin-top:4px;">
+            答えた: ${entry.totalAnswers || 0}問 | 正解率: ${entry.accuracy || 0}%
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;background:none;">${entry.learned || 0}</span>
+          <div style="font-size:11px;color:#888;margin-top:2px;">覚えた</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 let adminMode = false;
 let swipeHistory = [];
@@ -1638,46 +1684,6 @@ function saveAdminTestDate(){
   alert('テスト日を更新しました');
 }
 
-function renderLeaderboard(boardData = leaderboard) {
-  const el = document.getElementById('leaderboard-content');
-  if (!el) return;
-  if (!boardData || !boardData.length) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">まだランキングがありません。一番乗りを目指しましょう！</div>';
-    return;
-  }
-  
-  el.innerHTML = boardData.map((entry, i) => {
-    // メールアドレスを一部隠す処理（プライバシー配慮）
-    let emailDisplay = '';
-    if (entry.email) {
-      const [local, domain] = entry.email.split('@');
-      emailDisplay = `${local.slice(0, 2)}***@${domain}`;
-    }
-
-    const isMe = entry.uid === (currentUser ? currentUser.uid : null);
-    const bgColor = isMe ? '#e3f2fd' : '#f9f9f9'; // 自分のランクは青く光らせる
-
-    return `<div class="review-item" style="padding:12px;margin-bottom:10px;border:1px solid ${isMe ? '#90caf9' : '#e0e0e0'};border-radius:8px;background:${bgColor};">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-        <div style="min-width:0;flex:1;">
-          <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">
-            ${i===0?'👑 ':i===1?'🥈 ':i===2?'🥉 ':''}${i+1}. ${entry.displayName || entry.name}
-            ${isMe ? '<span style="font-size:10px;background:#1976d2;color:white;padding:2px 6px;border-radius:4px;margin-left:6px;">あなた</span>' : ''}
-          </div>
-          ${emailDisplay ? `<div style="font-size:11px;color:#888;">✉️ ${emailDisplay}</div>` : ''}
-          <div class="review-jp" style="font-size:12px;color:#666;margin-top:4px;">
-            答えた: ${entry.totalAnswers || 0}問 | 正解率: ${entry.accuracy || 0}%
-          </div>
-        </div>
-        <div style="text-align:center;">
-          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;background:none;">${entry.learned || 0}</span>
-          <div style="font-size:11px;color:#888;margin-top:2px;">覚えた</div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
 window.addEventListener('load', async () => {
   console.log('📄 Window load イベント発火');
   const hasInitFunc = typeof initializeFirebase === 'function';
@@ -1738,13 +1744,11 @@ function saveTestDate(){
   startCountdown();
 }
 
-// ─── 追加したクイックテスト日設定関数 ──────────────────────
 function setQuickTestDate(dateStr, timeStr) {
   document.getElementById('testdate-date').value = dateStr;
   document.getElementById('testdate-time').value = timeStr;
-  saveTestDate(); // 即座に保存してモーダルを閉じる
+  saveTestDate();
 }
-// ────────────────────────────────────────────────────────
 
 function clearTestDate(){
   testDate = null;
