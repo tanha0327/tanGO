@@ -1451,12 +1451,7 @@ function updateLeaderboardAccess(){
   const enabled = Boolean(playerName);
   const openBtn = document.getElementById('btn-open-leaderboard');
   if(openBtn) openBtn.disabled = !enabled;
-  const summaryEl = document.getElementById('leaderboard-summary');
-  if(summaryEl){
-    summaryEl.textContent = enabled
-      ? (leaderboard.length ? '' : 'まだランキングがありません。クイズを完了して結果をランキングに残しましょう。')
-      : '名前を入力するとランキングが見られます。';
-  }
+  // ※ここにあった leaderboard-summary を上書きしてしまう邪魔なコードを削除しました！
 }
 
 function requirePlayerName(){
