@@ -295,6 +295,63 @@ async function syncAllWordsToCloud(uid, localWordStats) {
   }
 }
 
+/**
+ * 👑 ランキングに自分のスコアを送信する
+ */
+async function saveScoreToLeaderboard(stats) {
+  try {
+    const initialized = await initializeFirebase();
+    if (!initialized || !currentUser) return; // ログインしていない場合はスキップ
+
+    const ref = db.collection('leaderboard').doc(currentUser.uid);
+    await ref.set({
+      uid: currentUser.uid,
+      displayName: currentUser.displayName || '名無しユーザー',
+      email: currentUser.email, // ご要望のメアドを保存
+      learned: stats.learned || 0,
+      totalAnswers: stats.totalAnswers || 0,
+      accuracy: stats.accuracy || 0,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp() // サーバーの正確な時間
+    }, { merge: true });
+
+    console.log('✅ ランキングデータをクラウドに送信しました');
+  } catch (error) {
+    console.error('❌ ランキング送信失敗:', error);
+  }
+}
+
+/**
+ * 👑 全体のトップランキングを取得する
+ */
+async function getGlobalLeaderboardFromCloud(limitCount = 10) {
+  try {
+    const initialized = await initializeFirebase();
+    if (!initialized) return [];
+
+    // 覚えた単語数(learned)が多い順に取得
+    const snapshot = await db.collection('leaderboard')
+      .orderBy('learned', 'desc')
+      .orderBy('accuracy', 'desc')
+      .limit(limitCount)
+      .get();
+
+    const globalBoard = [];
+    snapshot.forEach(doc => {
+      globalBoard.push(doc.data());
+    });
+
+    console.log(`✅ クラウドからトップ ${globalBoard.length} 名のランキングを取得しました`);
+    return globalBoard;
+  } catch (error) {
+    console.error('❌ ランキング取得失敗:', error);
+    return [];
+  }
+}
+
+// 追加した関数をグローバルにエクスポート（ファイルの最後に追加）
+window.saveScoreToLeaderboard = saveScoreToLeaderboard;
+window.getGlobalLeaderboardFromCloud = getGlobalLeaderboardFromCloud;
+
 // グローバルスコープにエクスポート
 window.initializeFirebase = initializeFirebase;
 window.loginWithGoogle = loginWithGoogle;
@@ -316,3 +373,4 @@ console.log('✅ firebase-integration.js 読み込み完了');
 console.log('  - initializeFirebase: ', typeof window.initializeFirebase);
 console.log('  - loginWithGoogle: ', typeof window.loginWithGoogle);
 console.log('  - onAuthStateChangedListener: ', typeof window.onAuthStateChangedListener);
+
