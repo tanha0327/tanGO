@@ -1223,17 +1223,26 @@ function renderQuestion() {
   setTimeout(()=>document.getElementById('quiz-answer').focus(),50);
 }
 
+// 【修正版】AIを廃止し、直接ローカルの自動採点を呼び出す
 async function submitAnswer() {
   if(resultShowing) return;
   const userAns=document.getElementById('quiz-answer').value.trim();
   const {word:w,dir}=state.queue[state.current];
+  
   document.getElementById('quiz-answer').disabled=true;
   document.getElementById('btn-submit').style.display='none';
   resultShowing=true;
-  document.getElementById('ai-loading').style.display='block';
-  await gradeAI(w,userAns,dir);
+  
+  // 🤖AIローディングをスキップして、直接ローカルの手動（自動）採点を実行
+  gradeManual(w, userAns, dir);
+  
   document.getElementById('btn-submit').style.display='none';
   document.getElementById('btn-next').style.display='block';
+}
+
+// ※万が一どこかから呼び出された時のための安全用ダミー関数
+async function gradeAI(w,userAns,dir){
+  gradeManual(w, userAns, dir);
 }
 
 function normalize(s){return s.toLowerCase().replace(/[《》\(\)\s「」『』]/g,'').trim();}
