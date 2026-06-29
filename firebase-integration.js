@@ -62,17 +62,41 @@ function onAuthStateChangedListener(callback) {
 }
 
 // Googleログイン
+// 変更箇所：loginWithGoogle 関数を以下に差し替えてください
+
+// Googleログイン（リダイレクト方式に変更）
 async function loginWithGoogle() {
   try {
     const initialized = await initializeFirebase();
     if (!initialized) throw new Error("Firebase初期化失敗");
+    
+    // PopupからRedirectに変更してブロックを回避
     const provider = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
+    await auth.signInWithRedirect(provider);
   } catch (error) {
     console.error("❌ ログインエラー:", error);
     alert("ログインに失敗しました: " + error.message);
   }
 }
+
+// 追加：ページが読み込まれた時に、ログインが完了しているか確認する関数
+async function checkRedirectResult() {
+  try {
+    const initialized = await initializeFirebase();
+    if (!initialized) return;
+    
+    const result = await auth.getRedirectResult();
+    if (result.user) {
+      console.log("✅ ログイン完了:", result.user.displayName);
+      // ログイン成功時は自動的に画面更新などを行っても良い
+    }
+  } catch (error) {
+    console.error("❌ リダイレクト処理エラー:", error);
+  }
+}
+
+// 読み込み時にこの確認関数を呼ぶ
+checkRedirectResult();
 
 // ログアウト
 async function logout() {
