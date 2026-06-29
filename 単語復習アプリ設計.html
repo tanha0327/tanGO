@@ -1541,12 +1541,23 @@ function addLeaderboardEntry(name, correct, total) {
   updateStats();
 }
 
-function openLeaderboardModal(){
-  if(isGuest){ alert('ランキング機能を使用するにはGoogleアカウントでログインしてください。'); return; }
-  if(!playerName){ alert('ランキングを見るにはまず名前を入力してください。'); return; }
-  renderLeaderboard();
+async function openLeaderboardModal() {
+  if (isGuest) { alert('全体ランキングに参加・表示するにはGoogleアカウントでログインしてください。'); return; }
+  
+  // 読み込み中の表示
+  const el = document.getElementById('leaderboard-content');
+  if (el) el.innerHTML = '<div style="text-align:center;padding:2rem;color:#888;">☁️ クラウドからランキングを取得中...</div>';
   document.getElementById('leaderboard-modal').classList.add('open');
+
+  // クラウドから取得
+  if (typeof getGlobalLeaderboardFromCloud === 'function') {
+    const globalBoard = await getGlobalLeaderboardFromCloud(10);
+    renderLeaderboard(globalBoard);
+  } else {
+    renderLeaderboard(leaderboard); // オフラインフォールバック
+  }
 }
+
 function closeLeaderboardModal(){ document.getElementById('leaderboard-modal').classList.remove('open'); }
 
 let adminMode = false;
@@ -1614,25 +1625,39 @@ function saveAdminTestDate(){
   alert('テスト日を更新しました');
 }
 
-function renderLeaderboard(){
+function renderLeaderboard(boardData = leaderboard) {
   const el = document.getElementById('leaderboard-content');
-  if(!el) return;
-  if(!leaderboard.length){
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">ランキングはまだありません。</div>';
+  if (!el) return;
+  if (!boardData || !boardData.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#aaa;">まだランキングがありません。一番乗りを目指しましょう！</div>';
     return;
   }
-  el.innerHTML = leaderboard.map((entry,i)=>{
-    const date = new Date(entry.date);
-    const dateLabel = `${date.getFullYear()}/${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}`;
-    return `<div class="review-item" style="padding:12px;margin-bottom:10px;border:1px solid #e0e0e0;border-radius:8px;background:#f9f9f9;">
+  
+  el.innerHTML = boardData.map((entry, i) => {
+    // メールアドレスを一部隠す処理（プライバシー配慮）
+    let emailDisplay = '';
+    if (entry.email) {
+      const [local, domain] = entry.email.split('@');
+      emailDisplay = `${local.slice(0, 2)}***@${domain}`;
+    }
+
+    const isMe = entry.uid === (currentUser ? currentUser.uid : null);
+    const bgColor = isMe ? '#e3f2fd' : '#f9f9f9'; // 自分のランクは青く光らせる
+
+    return `<div class="review-item" style="padding:12px;margin-bottom:10px;border:1px solid ${isMe ? '#90caf9' : '#e0e0e0'};border-radius:8px;background:${bgColor};">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
         <div style="min-width:0;flex:1;">
-          <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">${i+1}. ${entry.name}</div>
-          <div class="review-jp" style="font-size:12px;color:#666;">${dateLabel}</div>
-          <div class="review-jp" style="font-size:12px;color:#666;margin-top:2px;">覚えた: ${entry.learned || 0}語 | 答えた: ${entry.totalAnswers || 0}問 | 正解率: ${entry.accuracy || 0}%</div>
+          <div class="review-en" style="font-size:16px;font-weight:600;margin-bottom:4px;">
+            ${i===0?'👑 ':i===1?'🥈 ':i===2?'🥉 ':''}${i+1}. ${entry.displayName || entry.name}
+            ${isMe ? '<span style="font-size:10px;background:#1976d2;color:white;padding:2px 6px;border-radius:4px;margin-left:6px;">あなた</span>' : ''}
+          </div>
+          ${emailDisplay ? `<div style="font-size:11px;color:#888;">✉️ ${emailDisplay}</div>` : ''}
+          <div class="review-jp" style="font-size:12px;color:#666;margin-top:4px;">
+            答えた: ${entry.totalAnswers || 0}問 | 正解率: ${entry.accuracy || 0}%
+          </div>
         </div>
         <div style="text-align:center;">
-          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;">${entry.learned || 0}</span>
+          <span class="badge-num" style="font-size:32px;font-weight:700;color:#1976d2;display:block;background:none;">${entry.learned || 0}</span>
           <div style="font-size:11px;color:#888;margin-top:2px;">覚えた</div>
         </div>
       </div>
