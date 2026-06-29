@@ -1233,14 +1233,14 @@ async function submitAnswer() {
   document.getElementById('btn-submit').style.display='none';
   resultShowing=true;
   
-  // 🤖AIローディングをスキップして、直接ローカルの手動（自動）採点を実行
+  // AIを完全にスキップして、直接ローカルの手動（自動）採点を実行
   gradeManual(w, userAns, dir);
   
   document.getElementById('btn-submit').style.display='none';
   document.getElementById('btn-next').style.display='block';
 }
 
-// ※万が一どこかから呼び出された時のための安全用ダミー関数
+// （エラー防止用のダミー関数）
 async function gradeAI(w,userAns,dir){
   gradeManual(w, userAns, dir);
 }
