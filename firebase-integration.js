@@ -328,10 +328,9 @@ async function getGlobalLeaderboardFromCloud(limitCount = 10) {
     const initialized = await initializeFirebase();
     if (!initialized) return [];
 
-    // 覚えた単語数(learned)が多い順に取得
+    // ⚠️ 複合インデックスエラーを避けるため、「learned（覚えた数）」のみでソートします
     const snapshot = await db.collection('leaderboard')
       .orderBy('learned', 'desc')
-      .orderBy('accuracy', 'desc')
       .limit(limitCount)
       .get();
 
