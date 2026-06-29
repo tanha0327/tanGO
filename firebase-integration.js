@@ -1,5 +1,5 @@
 // ==========================================
-// firebase-integration.js (リダイレクト方式・確定版)
+// firebase-integration.js (v10: 確実に待つ仕様)
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
@@ -11,38 +11,38 @@ const firebaseConfig = {
   measurementId: "G-1FY7HZ1JLE"
 };
 
-let app, auth, db, currentUser;
+let app, auth, db;
+let initPromise = null;
 
+// Firebase初期化を一度だけ実行し、結果を保持する
 async function initializeFirebase() {
-  if (!window.firebase) return false;
-  if (!firebase.apps.length) {
-    app = firebase.initializeApp(firebaseConfig);
-  } else {
-    app = firebase.app();
-  }
-  auth = firebase.auth();
-  db = firebase.firestore();
-  
-  // ログインの結果を確実に受け取る
-  try {
-    const result = await auth.getRedirectResult();
-    if (result.user) {
-      console.log("✅ リダイレクトからのログイン成功");
-    }
-  } catch (e) {
-    console.error("Redirect Error:", e);
-  }
+  if (initPromise) return initPromise; // すでに初期化中なら待つ
 
-  console.log("✅ Firebase & Firestore 初期化完了");
-  return true;
+  initPromise = (async () => {
+    if (!window.firebase) throw new Error("Firebase SDK 未読み込み");
+    if (!firebase.apps.length) {
+      app = firebase.initializeApp(firebaseConfig);
+    } else {
+      app = firebase.app();
+    }
+    auth = firebase.auth();
+    db = firebase.firestore();
+    
+    // リダイレクト結果の処理
+    try { await auth.getRedirectResult(); } catch(e) {}
+    
+    console.log("✅ Firebase & Firestore 準備完了");
+    return true;
+  })();
+  
+  return initPromise;
 }
 
-function onAuthStateChangedListener(callback) {
-  // ログイン状態が変わったら即座に反映
+// 読み込みを待ってから認証状態を監視
+async function onAuthStateChangedListener(callback) {
+  await initializeFirebase();
   auth.onAuthStateChanged((user) => {
-    currentUser = user;
-    if (user) {
-      // ユーザー登録処理
+    if (user && db) {
       db.collection('users').doc(user.uid).set({
         uid: user.uid,
         displayName: user.displayName || '名無し',
@@ -54,23 +54,25 @@ function onAuthStateChangedListener(callback) {
   });
 }
 
+// 読み込みを待ってからログイン
 async function loginWithGoogle() {
+  await initializeFirebase();
   const provider = new firebase.auth.GoogleAuthProvider();
   await auth.signInWithRedirect(provider);
 }
 
-async function logout() {
-  await auth.signOut();
-  window.location.href = window.location.href; // ページを更新
+function logout() {
+  if (auth) auth.signOut().then(() => window.location.reload());
 }
 
-// 👑 ランキング
+// 👑 ランキング (読み込みを待ってから)
 async function saveScoreToLeaderboard(stats) {
-  if (!db || !currentUser) return;
-  await db.collection('leaderboard').doc(currentUser.uid).set({
-    uid: currentUser.uid,
-    displayName: currentUser.displayName || '名無しユーザー',
-    email: currentUser.email,
+  await initializeFirebase();
+  if (!db || !auth.currentUser) return;
+  await db.collection('leaderboard').doc(auth.currentUser.uid).set({
+    uid: auth.currentUser.uid,
+    displayName: auth.currentUser.displayName || '名無しユーザー',
+    email: auth.currentUser.email,
     learned: stats.learned || 0,
     totalAnswers: stats.totalAnswers || 0,
     accuracy: stats.accuracy || 0,
@@ -79,11 +81,9 @@ async function saveScoreToLeaderboard(stats) {
 }
 
 async function getGlobalLeaderboardFromCloud(limitCount = 3) {
+  await initializeFirebase();
   if (!db) return [];
-  const snapshot = await db.collection('leaderboard')
-    .orderBy('learned', 'desc')
-    .limit(limitCount)
-    .get();
+  const snapshot = await db.collection('leaderboard').orderBy('learned', 'desc').limit(limitCount).get();
   return snapshot.docs.map(doc => doc.data());
 }
 
