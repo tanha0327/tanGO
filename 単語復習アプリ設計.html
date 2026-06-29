@@ -135,12 +135,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="modal-overlay" id="testdate-modal">
   <div class="modal-box">
     <div class="modal-title">📅 テスト日を設定</div>
+
+    <div class="card" style="margin-bottom:1rem; padding:0.75rem;">
+      <div class="label">🎯 クイック選択</div>
+      <div class="option-grid">
+        <button class="opt-btn" disabled style="background:#f5f5f5; color:#bbb; border-color:#eee; cursor:not-allowed;">
+          一学期中間<br><span style="font-size:10px;">(終了)</span>
+        </button>
+        <button class="opt-btn" onclick="setQuickTestDate('2026-07-03', '09:10')">
+          一学期期末<br><span style="font-size:10px;">(7/3 9:10)</span>
+        </button>
+      </div>
+    </div>
     <div style="margin-bottom:1rem;">
-      <div class="label">日付</div>
+      <div class="label">日付（手動）</div>
       <input type="date" id="testdate-date" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;outline:none;">
     </div>
     <div style="margin-bottom:1rem;">
-      <div class="label">時刻（空欄→ 当日 12:00 PM）</div>
+      <div class="label">時刻（手動 / 空欄→ 12:00 PM）</div>
       <input type="time" id="testdate-time" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;outline:none;">
     </div>
     <div class="modal-btns">
@@ -1687,6 +1699,15 @@ function saveTestDate(){
   closeTestDateModal();
   startCountdown();
 }
+
+// ─── 追加したクイックテスト日設定関数 ──────────────────────
+function setQuickTestDate(dateStr, timeStr) {
+  document.getElementById('testdate-date').value = dateStr;
+  document.getElementById('testdate-time').value = timeStr;
+  saveTestDate(); // 即座に保存してモーダルを閉じる
+}
+// ────────────────────────────────────────────────────────
+
 function clearTestDate(){
   testDate = null;
   try { localStorage.removeItem('vocab_testdate'); } catch {}
