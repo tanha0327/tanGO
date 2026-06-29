@@ -1388,12 +1388,21 @@ function updateStats(){
 
   const summaryEl = document.getElementById('leaderboard-summary');
   if (summaryEl) {
-    if (!leaderboard.length) {
-      summaryEl.textContent = isGuest ? 'ランキングを表示するにはGoogleでログインしてください。' : 'ランキングはまだありません。名前を入力して結果を残そう。';
-    } else {
-      summaryEl.innerHTML = leaderboard.slice(0,3).map((entry, i) =>
-        `<div style="margin-bottom:6px;">${i+1}. ${entry.name} — ${entry.learned}語覚えた (${entry.accuracy}%)</div>`
-      ).join('');
+    summaryEl.innerHTML = '<span style="color:#888;">☁️ 取得中...</span>';
+    // クラウドからトップ3だけを自動取得して表示
+    if (typeof getGlobalLeaderboardFromCloud === 'function') {
+      getGlobalLeaderboardFromCloud(3).then(board => {
+        if (!board || board.length === 0) {
+          summaryEl.textContent = 'まだランキングがありません。一番乗りを目指しましょう！';
+        } else {
+          summaryEl.innerHTML = board.map((entry, i) =>
+            `<div style="margin-bottom:6px; font-weight:600;">
+              ${i===0?'👑':i===1?'🥈':'🥉'} ${i+1}. ${entry.displayName || entry.name} 
+              <span style="font-weight:normal; font-size:12px; color:#666;">— ${entry.learned}語 (${entry.accuracy}%)</span>
+            </div>`
+          ).join('');
+        }
+      });
     }
   }
 
