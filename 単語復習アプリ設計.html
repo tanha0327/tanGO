@@ -5,12 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>単語復習アプリ</title>
 
-<!-- Firebase SDK compat バージョン (必須: firebase-integration.js より前に読み込むこと) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/compat/firebase-firestore.js"></script>
 
-<!-- Firebase Integration (Firebase SDK の後に読み込むこと) -->
 <script src="firebase-integration.js?v=6"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -120,13 +118,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </head>
 <body>
 
-<!-- ログイン画面 -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <div class="login-title">単語復習アプリ</div>
     <div class="login-subtitle">Googleアカウントでログインするか、ゲストとして使用してください。ランキング機能はログインが必要です。</div>
     <div class="login-buttons">
-      <!-- ＝ 修正後 ＝ -->
 <button class="login-btn login-btn-google" id="google-signin-button" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
       <button class="login-btn login-btn-guest" onclick="loginAsGuest()">👤 ゲストで使用</button>
     </div>
@@ -136,9 +132,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div id="app-container" style="display: none;">
 
-<body>
-
-<!-- テスト日設定モーダル -->
 <div class="modal-overlay" id="testdate-modal">
   <div class="modal-box">
     <div class="modal-title">📅 テスト日を設定</div>
@@ -158,7 +151,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- 名前入力モーダル -->
 <div class="modal-overlay" id="name-modal">
   <div class="modal-box">
     <div class="modal-title">🙋‍♂️ ニックネームを入力してください</div>
@@ -171,7 +163,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- 途中退出モーダル -->
 <div class="modal-overlay" id="exit-modal">
   <div class="modal-box">
     <div class="modal-title">途中退出しますか？</div>
@@ -183,7 +174,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- ランダムN問モーダル（通常） -->
 <div class="modal-overlay" id="random-modal">
   <div class="modal-box">
     <div style="text-align:center; margin-bottom:4px;">
@@ -192,10 +182,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="font-size:15px; color:#888; margin-top:2px; margin-bottom:16px;">問</div>
     </div>
     <div style="font-size:11px; color:#aaa; margin-bottom:4px; display:flex; justify-content:space-between;">
-      <span>1問</span><span id="random-n-max-lbl">141問（全部）</span>
+      <span>1問</span><span id="random-n-max-lbl">283問（全部）</span>
     </div>
     <div class="slider-wrap" style="margin-bottom:1rem;">
-      <input type="range" id="random-n-slider" min="1" max="141" value="50" oninput="updateRandomN(this.value, true)">
+      <input type="range" id="random-n-slider" min="1" max="283" value="50" oninput="updateRandomN(this.value, true)">
     </div>
     <div class="card" style="margin-bottom:1rem;">
       <div class="label">問題の方向</div>
@@ -211,14 +201,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- 友達モードモーダル（問数設定） -->
 <div class="modal-overlay" id="friend-setup-modal">
   <div class="modal-box">
     <div class="modal-title">👫 友達モード</div>
     <div class="slider-val"><span id="friend-n-val">50</span>問</div>
     <div class="slider-wrap" style="margin-bottom:0.5rem;">
-      <input type="range" id="friend-n-slider" min="1" max="141" value="50" oninput="document.getElementById('friend-n-val').textContent=this.value">
-      <div class="slider-sub"><span>1問</span><span id="friend-n-max-lbl">141問（全部）</span></div>
+      <input type="range" id="friend-n-slider" min="1" max="283" value="50" oninput="document.getElementById('friend-n-val').textContent=this.value">
+      <div class="slider-sub"><span>1問</span><span id="friend-n-max-lbl">283問（全部）</span></div>
     </div>
     <div class="card" style="margin-top:1rem;">
       <div class="label">問題の方向</div>
@@ -234,7 +223,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- ランキングモーダル -->
 <div class="modal-overlay" id="leaderboard-modal">
   <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -246,7 +234,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- 復習モーダル -->
 <div class="modal-overlay" id="review-modal">
   <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -259,7 +246,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- 覚えた単語復習モーダル -->
 <div class="modal-overlay" id="learned-review-modal">
   <div class="modal-box" style="max-width:420px;max-height:85vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -281,16 +267,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div class="app">
 
-  <!-- ══ HOME ══════════════════════════════════════════ -->
   <div class="screen visible" id="screen-home">
-    <!-- ユーザー情報 & ログアウト -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;font-size:12px;">
       <div style="color:#666;">
         <span id="user-info"></span>
       </div>
       <button class="exit-btn" onclick="logout()" style="color:#2D7DD2;border-color:#2D7DD2;">🔓 ログアウト</button>
     </div>
-    <!-- カウントダウン -->
     <div class="countdown-card" id="countdown-card">
       <div class="countdown-label" id="countdown-label">テスト日を設定してください</div>
       <div class="countdown-days" id="countdown-days">--</div>
@@ -325,11 +308,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
 
-    <!-- 3色進捗バー -->
     <div class="card" style="margin-bottom:1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
         <span style="font-size:13px;font-weight:600;">全単語の習得進捗</span>
-        <span style="font-size:12px;color:#888;" id="progress-label">0 / 141語</span>
+        <span style="font-size:12px;color:#888;" id="progress-label">0 / 283語</span>
       </div>
       <div class="prog-bar-outer">
         <div class="prog-seg-learned"  id="prog-learned"  style="width:0%"></div>
@@ -346,7 +328,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
         <div class="prog-legend-item">
           <div class="prog-dot" style="background:#e0e0da;"></div>
-          未着手 <strong id="legend-unknown" style="color:#888;">141</strong>語
+          未着手 <strong id="legend-unknown" style="color:#888;">283</strong>語
         </div>
       </div>
       <div style="text-align:right;font-size:13px;font-weight:700;color:#2D7DD2;" id="progress-pct">0.0%</div>
@@ -362,26 +344,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
-  <!-- ══ SETUP（通常モード） ════════════════════════════ -->
   <div class="screen" id="screen-setup">
     <div class="card">
-      <div class="label">出題範囲</div>
+      <div class="label">🎯 試験範囲の選択</div>
+      <div class="option-grid">
+        <button class="opt-btn" onclick="setTestRange('midterm')">一学期中間 (1401〜1541)</button>
+        <button class="opt-btn" onclick="setTestRange('final')">一学期期末 (1542〜1683)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">出題範囲の詳細調整</div>
       <div style="font-size:13px;font-weight:600;text-align:center;color:#1a1a1a;margin-bottom:10px;">
-        No.<span id="range-from-lbl">1401</span> 〜 No.<span id="range-to-lbl">1541</span>
-        <span style="font-size:12px;font-weight:400;color:#888;margin-left:6px;">(<span id="range-count-lbl">141</span>語)</span>
+        No.<span id="range-from-lbl">1401</span> 〜 No.<span id="range-to-lbl">1683</span>
+        <span style="font-size:12px;font-weight:400;color:#888;margin-left:6px;">(<span id="range-count-lbl">283</span>語)</span>
       </div>
       <div style="margin-bottom:10px;">
         <div style="font-size:11px;color:#aaa;margin-bottom:4px;">開始</div>
         <div class="slider-wrap">
-          <input type="range" id="range-from" min="0" max="140" value="0" oninput="updateRangeSliders()">
-          <div class="slider-sub"><span>No.1401</span><span>No.1541</span></div>
+          <input type="range" id="range-from" min="0" max="282" value="0" oninput="updateRangeSliders()">
+          <div class="slider-sub"><span>No.1401</span><span>No.1683</span></div>
         </div>
       </div>
       <div>
         <div style="font-size:11px;color:#aaa;margin-bottom:4px;">終了</div>
         <div class="slider-wrap">
-          <input type="range" id="range-to" min="0" max="140" value="140" oninput="updateRangeSliders()">
-          <div class="slider-sub"><span>No.1401</span><span>No.1541</span></div>
+          <input type="range" id="range-to" min="0" max="282" value="282" oninput="updateRangeSliders()">
+          <div class="slider-sub"><span>No.1401</span><span>No.1683</span></div>
         </div>
       </div>
     </div>
@@ -403,7 +392,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <button class="big-btn btn-secondary" onclick="showScreen('screen-home')">← 戻る</button>
   </div>
 
-  <!-- ══ QUIZ（通常モード） ════════════════════════════ -->
   <div class="screen" id="screen-quiz">
     <div class="quiz-header">
       <span id="quiz-counter" style="font-size:13px;color:#888;"></span>
@@ -424,7 +412,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
-  <!-- ══ QUIZ（友達モード） ════════════════════════════ -->
   <div class="screen" id="screen-friend">
     <div class="quiz-header">
       <span id="friend-counter" style="font-size:13px;color:#888;"></span>
@@ -446,7 +433,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
-  <!-- ══ RESULT ═════════════════════════════════════════ -->
   <div class="screen" id="screen-result">
     <div class="card" style="text-align:center;padding:2rem;">
       <div style="font-size:40px;margin-bottom:8px;" id="result-emoji"></div>
@@ -465,6 +451,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
+// 新しい単語をすべて追加したデータリスト
 const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1402	boil	をわかす，ふっとうする，を煮る，煮える
 1403	melt	を溶かす，溶ける
@@ -499,7 +486,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1432	square	正方形，四角／(四角い)広場／《数学で》平方，二乗／正方形の／平方の
 1433	circle	円／仲間，団体
 1434	level	水平な，平らな／水平(面)／水準
-1435	sheet	(紙などの)枚／《通常(複)で》シーツ
+1435	sheet	(紙などの)枚／《通常(複)で>シーツ
 1436	row	列，並び／(ボート)をこぐ
 1437	flow	流れる／流れ
 1438	float	浮かぶ，を浮かべる
@@ -605,7 +592,149 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1538	weapon	武器
 1539	crime	罪，犯罪
 1540	poison	毒，毒薬／を毒する，を害する
-1541	alarm	警報(器)，目覚まし時計／驚き，恐怖／に警報を発する`;
+1541	alarm	警報(器)，目覚まし時計／驚き，恐怖／に警報を発する
+1542	shock	衝撃的なこと，(精神的な)ショック／に衝撃・ショックを与える
+1543	thief	どろぼう，空き巣
+1544	harm	害，損害／に害を与える
+1545	risk	(自ら冒す)危険
+1546	steal	(こっそりと)(を)盗む
+1547	rob	を奪う，を強奪する
+1548	assure	を保証する
+1549	explode	爆発する，を爆発させる
+1550	pollute	を汚染する
+1551	ruin	を台なしにする，を破壊する／破滅／《通常(複)で》廃墟
+1552	crash	(自動車が)衝突する，(飛行機が)墜落する／(激しい音を立てて)壊れる／衝突，墜落
+1553	arrest	逮捕する／逮捕
+1554	grab	をつかむ，をつかみ取る／つかむこと
+1555	traffic	交通(量)
+1556	transportation	輸送(機関)，交通機関
+1557	avenue	大通り
+1558	path	小道，細道
+1559	license	免許(証)，許可
+1560	signal	信号(機)，合図／(に)信号を送る，(に)合図する
+1561	fuel	燃料
+1562	baggage	(旅行の)手荷物《米》
+1563	advise	(に)忠告する，(に)助言する
+1564	suggest	を提案する／をそれとなく言う
+1565	recommend	を推薦する，を勧める
+1566	reply	返事をする，答える／返事，答え
+1567	describe	を描写する，の特徴を述べる
+1568	announce	を発表する，を知らせる
+1569	publish	(を)出版する
+1570	debate	討論，議論／を討論する，議論する
+1571	statement	声明(書)
+1572	association	協会，連合，連想
+1573	committee	委員会，(全)委員
+1574	independence	独立，自立
+1575	duty	義務／職務／関税
+1576	structure	構造(物)／構成
+1577	the day before yesterday	おととい
+1578	the day after tomorrow	あさって
+1579	the other day	先日，このあいだ
+1580	these days	このごろ(は)
+1581	in those days	当時は，そのころは
+1582	at that time	そのころは，当時は
+1583	each time	……するたびに
+1584	all the time	いつも／そのあいだずっと
+1585	day after day	毎日毎日
+1586	day by day	日ごとに
+1587	every other day	日おきに
+1588	over and over again	何度も何度も
+1589	as usual	いつものように
+1590	by chance	偶然に
+1591	pull out (～)	(～)を引き抜く／(列車・船などが)出発する
+1592	point out ～	～を指摘する
+1593	wear out (～)	(～)をすり減らす，すり減る，を使い古す，使い古される／(人)を疲れさせる
+1594	see off ～	～を見送る
+1595	pay[give] attention to	……に注意を払う
+1596	pay[make] a visit to	…(場所)を訪れる，(人)を訪問する
+1597	in front of	……の前に，…の正面に
+1598	in back of	……の後ろに
+1599	in the middle of	……の真ん中に，…の中央に，…の最中に
+1600	at the top of	……の頂上に，…の(一番)上に
+1601	at the bottom of	……の底に，…の(一番)下に
+1602	next to	……のとなりに／《順番・程度などが》…の次に
+1603	across from	……の向かいに
+1604	out of	……の中から，…から外に／…の範囲を越えて／…がなくなって
+1605	as … as one can /as … as possible	できるだけ…
+1606	… as well	同様に…，…もまた
+1607	the same … as	～～と同じ…
+1608	…(,) such as ～	(たとえば)～のような…
+1609	such … as to do	～するような…
+1610	be about to do	(まさに)～しようとしている，～するところである
+1611	in order to do	～するために
+1612	too … to do	～するには…すぎる，あまりに…なので～できない
+1613	… enough to do	～するのに十分…，とても…なので～する
+1614	go along[down]	……をまっすぐ行く
+1615	catch up (with …)	(…に)追いつく
+1616	feel sorry for	……のことを気の毒に思う
+1617	remind 〈人〉 of …	に…を思い出させる
+1618	owe … to ～	…は～のおかげである，～に…のことで恩を受けている／～に…(金など)を借りている
+1619	no longer	もはや…でない，もはや…しない
+1620	not … at all	少しも…ない，全然…ない
+1621	not always …	いつも…とは限らない，必ずしも…とは限らない
+1622	anything but …	《do – but…》…以外なら何でもする／決して…ではない
+1623	nothing but …	ただ…だけ，…にすぎない／《do – but…》…してばかりいる
+1624	far from	……からはほど遠い，少しも…でない
+1625	by no means …	決して…ない，まったく…ない
+1626	get rid of	……を取り除く，…を駆除する
+1627	look into	……を調査する，…を研究する
+1628	pick up ～	～を拾いあげる／(車で)を迎える，を迎えに行く
+1629	set up ～	～を立てる，を設置する
+1630	take up ～	～(趣味など)を始める
+1631	turn up	現れる，見つかる
+1632	take … for granted	…を当然のことと思う
+1633	powerful	強力な，力強い
+1634	capable	有能な／《be – of …[～ing]》…できる
+1635	clever	りこうな
+1636	wealthy	裕福な
+1637	positive	積極的な／確実な／肯定的な／陽性の
+1638	efficient	有能な，能率的な
+1639	suitable	適した，ふさわしい
+1640	essential	不可欠の，本質的な／不可欠のもの
+1641	pure	純粋な，清らかな
+1642	skillful	熟練した，じょうずな
+1643	superior	優れている，上位の
+1644	concept	概念
+1645	process	過程，製法
+1646	definition	定義，語義
+1647	research	(を)研究する，(を)調査する／研究，調査
+1648	observe	(を)観察する
+1649	measure	(を)測る／寸法／(ものさしなどの)測定器具
+1650	estimate	(を)見積もる／を評価する／見積もり(額)／評価
+1651	memorize	を記憶する，を暗記する
+1652	refer	《+ to …》…に言及する／…を参照する
+1653	arrange	を整える，を並べる／(を)取り決める，(を)手配する
+1654	adjust	を調節する，を調整する，を適合させる
+1655	imitate	をまねる，模倣する／を見習う
+1656	explore	を探検する
+1657	translate	(を)翻訳する
+1658	comprehend	を理解する／を包む
+1659	consult	(専門家)に相談する，に意見を求める／(辞書・地図など)を調べる
+1660	manage	を管理する，を経営する／《+ to do》なんとか…する
+1661	rough	(表面が)でこぼこした，ざらざらした／荒っぽい／おおよその
+1662	flat	平らな，平たい，(時間が)きっかり／アパート(の室)《英》
+1663	smooth	(表面・動作が)なめらかな
+1664	broad	(幅が)広い，広々した
+1665	narrow	(幅が)狭い，細い
+1666	specific	明確な，特定の，具体的な／仕様(書)，明細(書)
+1667	fortunately	幸運にも
+1668	frankly	率直に
+1669	anyway	とにかく，いずれにせよ
+1670	therefore	それゆえに，それで
+1671	eventually	最後には，ついに
+1672	furthermore	さらに，その上
+1673	moreover	その上，さらに
+1674	thus	したがって，それゆえ／このように
+1675	survey	調査／ざっと見渡すこと／を調査する／をざっと見渡す
+1676	object	物体／対象(物)／目的／《+ to … 》…に反対する
+1677	mission	使命，任務／使節団／伝道，布教
+1678	frequency	しばしば起こること，頻発／頻度
+1679	average	平均，標準／平均の，普通の
+1680	standard	基準，標準，水準／標準の，標準的な
+1681	relation	関係，関連
+1682	combination	組み合わせ，結合
+1683	evidence	証拠`;
 
 let ALL_WORDS = [];
 const DB_NAME = 'vocab_app_db';
@@ -726,7 +855,8 @@ async function ensureWordsDatabase() {
   try {
     const db = await openDatabase();
     const existing = await getAllWordsFromDb(db);
-    if (existing.length > 0) return existing;
+    // 新しい単語が追加されている場合はIndexedDBを自動更新するよう修正
+    if (existing.length >= initialWords.length) return existing;
     await saveWordsToDb(db, initialWords);
     return initialWords;
   } catch (e) {
@@ -791,34 +921,25 @@ async function init() {
 }
 
 // ─── ログイン管理 ────────────────────────────────────────
-// ─── ログイン管理（ここをFirebase用に丸ごと置き換え） ───────────
 function checkAuthStatus() {
-  // firebase-integration.js で作った本物の監視ツールを呼び出します
   console.log('🔍 checkAuthStatus() 実行');
   if (typeof onAuthStateChangedListener === 'function') {
     onAuthStateChangedListener((user) => {
       if (user) {
-        // Firebaseでログイン成功している場合
         isGuest = false;
         googleUser = user;
-        playerId = user.uid; // FirebaseのユーザーIDをそのまま使用
+        playerId = user.uid;
         playerName = user.displayName || 'ユーザー';
-        
-        // ニックネーム履歴に保存
         if (!playerNameHistory.includes(playerName)) {
           playerNameHistory.push(playerName);
         }
-        
-        // ローカルストレージを同期
         saveStorage();
         showApp();
       } else {
-        // ログインしていない場合
         showLoginScreen();
       }
     });
   } else {
-    // Firebase が利用できない場合もログイン画面を表示
     console.log('ℹ️  Firebase 利用不可（ゲストモードのみ可能）');
     showLoginScreen();
   }
@@ -844,32 +965,7 @@ function loginAsGuest() {
   showApp();
 }
 
-function initializeGoogleSignIn() {
-  if (!window.google || !google.accounts) {
-    console.warn('Google Sign-In script not loaded. Using demo mode.');
-    return;
-  }
-  const clientId = 'YOUR_GOOGLE_CLIENT_ID_HERE';
-  if (clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
-    console.warn('Google Client ID not configured. Using demo mode.');
-    return;
-  }
-  google.accounts.id.initialize({
-    client_id: clientId,
-    callback: handleGoogleSignIn
-  });
-  google.accounts.id.renderButton(
-    document.getElementById('google-signin-button'),
-    { 
-      theme: 'outline', 
-      size: 'large',
-      text: 'signin'
-    }
-  );
-}
-
 function demoGoogleLogin() {
-  // ボタンからここが呼ばれても自動的にFirebaseのログインが走るようにします
   if (typeof loginWithGoogle === 'function') {
     loginWithGoogle().catch(err => {
       console.error("Firebase Login Error:", err);
@@ -880,50 +976,17 @@ function demoGoogleLogin() {
   }
 }
 
-function handleGoogleSignIn(response) {
-  if (response.credential) {
-    try {
-      const decoded = parseJwt(response.credential);
-      googleUser = {
-        id: decoded.sub,
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture
-      };
-      isGuest = false;
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ isGuest: false, googleUser }));
-      showApp();
-    } catch (e) {
-      console.error('Failed to parse Google token:', e);
-      alert('ログインに失敗しました');
-    }
-  }
-}
-
-function parseJwt(token) {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-  }).join(''));
-  return JSON.parse(jsonPayload);
-}
-
 function logout() {
   isGuest = false;
   googleUser = null;
   localStorage.removeItem(AUTH_KEY);
   showLoginScreen();
-  if (window.google && google.accounts) {
-    google.accounts.id.disableAutoSelect();
-  }
 }
 
 async function initApp() {
   console.log('📱 initApp() 実行開始');
   try {
     await init();
-    console.log('✅ init() 完了');
     updateStats();
     updateLeaderboardAccess();
     updateRangeSliders();
@@ -960,6 +1023,20 @@ function showScreen(id) {
   if(screen) screen.classList.add('visible');
 }
 
+// ─── クイック試験範囲設定ボタンの処理関数 ──────────────────────
+function setTestRange(type) {
+  const fromSlider = document.getElementById('range-from');
+  const toSlider = document.getElementById('range-to');
+  if (type === 'midterm') {
+    fromSlider.value = 0;   // No.1401
+    toSlider.value = 140;   // No.1541
+  } else if (type === 'final') {
+    fromSlider.value = 141; // No.1542
+    toSlider.value = 282;   // No.1683
+  }
+  updateRangeSliders();
+}
+
 // ─── スライダー ──────────────────────────────────────────
 function updateRangeSliders() {
   const fi=parseInt(document.getElementById('range-from').value);
@@ -992,13 +1069,12 @@ function confirmExit() { closeExitModal(); if(state.results.length===0){showScre
 
 function updateRandomN(val, isUserInput = false) {
   const n = parseInt(val);
-  const max = parseInt(document.getElementById('random-n-slider').max) || 141;
+  const max = parseInt(document.getElementById('random-n-slider').max) || 283;
   if (isUserInput) {
     const sl = document.getElementById('random-n-slider');
     if (sl) sl.dataset.userChanged = '1';
   }
-  const ratio = (n - 1) / Math.max(max - 1, 1); // 0.0〜1.0
-  // 青(#2D7DD2) → 黄(#f5a623) → 赤(#e53935) のグラデーション
+  const ratio = (n - 1) / Math.max(max - 1, 1);
   let r, g, b;
   if (ratio < 0.5) {
     const t = ratio * 2;
@@ -1048,14 +1124,13 @@ function startStudy() {
   let words=ALL_WORDS.slice(lo, hi+1);
   if(!words.length){alert('範囲を確認してください');return;}
   if(state.order==='random') words=shuffle(words);
-  // 昇順はslice順がそのまま昇順なのでOK
   state.queue=words.map(w=>({word:w,dir:state.direction}));
   state.current=0; state.results=[]; state.isReviewMode=false; state.isFriendMode=false;
-  state.scoreMode='ai'; // 常にAI採点
+  state.scoreMode='ai';
   showScreen('screen-quiz'); renderQuestion();
 }
 
-// ─── 学習開始：ランダムN問（スマート優先） ───────────────
+// ─── 学習開始：ランダムN問 ───────────────────────────────
 function getSmartRandomQueue(n, dir) {
   const withCount=ALL_WORDS.map(w=>({word:w,attempts:totalAttempts(w)}));
   const allDone=withCount.every(x=>x.attempts>0);
@@ -1086,7 +1161,6 @@ function startRandomN() {
   showScreen('screen-quiz'); renderQuestion();
 }
 
-// ─── 学習開始：友達モード ────────────────────────────────
 function startFriendMode() {
   if(!requirePlayerName()) return;
   closeFriendSetupModal();
@@ -1096,7 +1170,6 @@ function startFriendMode() {
   showScreen('screen-friend'); renderFriendQuestion();
 }
 
-// ─── 学習開始：復習 ──────────────────────────────────────
 function startReviewQuiz() {
   if(!requirePlayerName()) return;
   closeReviewModal();
@@ -1108,7 +1181,6 @@ function startReviewQuiz() {
   showScreen('screen-quiz'); renderQuestion();
 }
 
-// ─── 学習開始：間違えやすい問題集 ───────────────────────
 function startWeakWords() {
   if(!requirePlayerName()) return;
   const weak=[];
@@ -1143,13 +1215,12 @@ async function submitAnswer() {
   if(resultShowing) return;
   const userAns=document.getElementById('quiz-answer').value.trim();
   const {word:w,dir}=state.queue[state.current];
-  const mode=state.isReviewMode?state.reviewScoreMode:state.scoreMode;
   document.getElementById('quiz-answer').disabled=true;
   document.getElementById('btn-submit').style.display='none';
   resultShowing=true;
   document.getElementById('ai-loading').style.display='block';
   await gradeAI(w,userAns,dir);
-  document.getElementById('btn-submit').style.display='none'; // 念のため
+  document.getElementById('btn-submit').style.display='none';
   document.getElementById('btn-next').style.display='block';
 }
 
@@ -1277,9 +1348,8 @@ function renderReviewModal(){
 
 function removeReview(i){reviewWords.splice(i,1);saveStorage();updateStats();renderReviewModal();}
 
-// ─── 統計・進捗（3色バー） ───────────────────────────────
+// ─── 統計・進捗 ──────────────────────────────────────────
 function updateStats(){
-  // ユーザー情報を更新
   const userInfoEl = document.getElementById('user-info');
   if (userInfoEl) {
     if (isGuest) {
@@ -1306,20 +1376,18 @@ function updateStats(){
     }
   }
 
-  // 間違えやすい問題集ボタン
   const hasWeak=ALL_WORDS.some(w=>['jp-en','en-jp'].some(dir=>{const mr=missRate(w.id,dir);return mr!==null&&mr>0.3;}));
   const wb=document.getElementById('btn-weak-home');
   if(wb) wb.style.display=hasWeak?'block':'none';
 
-  // 3色バー計算
+  // 総単語数283語を自動計算
   const TOTAL=ALL_WORDS.length;
   const learned=state.learnedCount;
-  // 「学習中」= 1回以上挑戦したが覚えていない（単語単位でカウント）
   const studying=ALL_WORDS.filter(w=>{
     const jp=wordStats[skey(w.id,'jp-en')]; const en=wordStats[skey(w.id,'en-jp')];
     const attempts=(jp?jp.attempts:0)+(en?en.attempts:0);
     return attempts>0;
-  }).length - Math.min(learned, TOTAL);  // 挑戦済み - 覚えた
+  }).length - Math.min(learned, TOTAL);
   const studyingClamped=Math.max(0,studying);
   const unknownCount=Math.max(0,TOTAL-learned-studyingClamped);
   const learnedPct=Math.min(100,(learned/TOTAL)*100);
@@ -1431,7 +1499,6 @@ function addLeaderboardEntry(name, correct, total){
   
   const existingIndex = leaderboard.findIndex(entry => isCurrentPlayerEntry(entry));
   if (existingIndex !== -1) {
-    const existing = leaderboard[existingIndex];
     leaderboard[existingIndex] = {
       playerId,
       name: normalizedName,
@@ -1561,33 +1628,20 @@ function renderLeaderboard(){
   }).join('');
 }
 
-// firebase-integration.js が読み込まれ、Firebase SDK が利用可能になるまで待機
-// 方法1: window.load イベント
 window.addEventListener('load', async () => {
   console.log('📄 Window load イベント発火');
   const hasInitFunc = typeof initializeFirebase === 'function';
-  console.log(`Firebase 準備状態: initializeFirebase=${hasInitFunc}, firebase=${typeof window.firebase}`);
-  
   if (hasInitFunc) {
-    // Firebase を初期化（失敗してもゲストモードで続行）
-    console.log('🚀 Firebase 初期化開始...');
     try {
       await initializeFirebase();
     } catch (error) {
       console.error('Firebase 初期化エラー（ゲストモードで続行）:', error);
     }
-  } else {
-    console.warn('⚠️ firebase-integration.js がまだ読み込まれていません（ゲストモードのみ）');
   }
-  
-  // Firebase の結果に関わらず、認証状態をチェック
-  console.log('✅ checkAuthStatus() 呼び出し中...');
   checkAuthStatus();
 });
 
-// 方法2: すぐに実行（ページロード完了を待たない）
 (async () => {
-  console.log('⚡ 即座に initializeFirebase 実行');
   if (typeof initializeFirebase === 'function') {
     try {
       await initializeFirebase();
@@ -1598,7 +1652,7 @@ window.addEventListener('load', async () => {
 })();
 
 // ─── テスト日 ────────────────────────────────────────────────
-let testDate = null; // Date object
+let testDate = null;
 let countdownTimer = null;
 let lrDir = 'jp-en';
 
@@ -1700,7 +1754,6 @@ function tickCountdown(){
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 
-  // ノルマ計算：(学習中+未着手) / (残り日数+1)
   const TOTAL = ALL_WORDS.length;
   const learned = state.learnedCount;
   const studying = ALL_WORDS.filter(w=>{
@@ -1713,19 +1766,16 @@ function tickCountdown(){
   const norma = Math.ceil(remaining / (days + 1));
   normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
 
-  // ランダムN問のスライダー初期値をノルマに設定
   const sl = document.getElementById('random-n-slider');
   if (sl && !sl.dataset.userChanged) {
-    sl.value = Math.min(norma, parseInt(sl.max)||141);
+    sl.value = Math.min(norma, parseInt(sl.max)||283);
     updateRandomN(sl.value);
   }
 }
 
-// ランダムN問モーダルを開く時にもノルマ値をセット
 const _origOpenRandomModal = openRandomModal;
 openRandomModal = function(){
   _origOpenRandomModal();
-  // ノルマを再計算してスライダーに反映
   if (testDate) {
     const now = new Date();
     const diff = testDate - now;
@@ -1739,7 +1789,7 @@ openRandomModal = function(){
       const unknown=Math.max(0,TOTAL-learned-studying);
       const norma=Math.ceil((studying+unknown)/(days+1));
       const sl=document.getElementById('random-n-slider');
-      if(sl){ sl.dataset.userChanged = ''; sl.value=Math.min(norma,parseInt(sl.max)||141); updateRandomN(sl.value); }
+      if(sl){ sl.dataset.userChanged = ''; sl.value=Math.min(norma,parseInt(sl.max)||283); updateRandomN(sl.value); }
     }
   }
 };
@@ -1754,8 +1804,6 @@ function openLearnedReviewModal(){
 function closeLearnedReviewModal(){ document.getElementById('learned-review-modal').classList.remove('open'); }
 
 function renderLearnedReviewList(){
-  // 覚えた単語 = wordStats に correct がある単語（misses=0 or 正解率高い）のうちトップN
-  // ここでは「正解率100%かつ1回以上」の単語を「覚えた」とみなす
   const learnedWords = ALL_WORDS.filter(w=>{
     const s = wordStats[skey(w.id, lrDir)];
     return s && s.attempts>0 && s.misses===0;
