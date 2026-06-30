@@ -517,20 +517,39 @@ const state = {
 
 let isGuest = false;
 
-window.onload = () => {
+window.onload = async () => {
+  console.log("🚀 アプリ初期化開始...");
+  
+  // 1. Firebaseの初期化を待つ
+  if (typeof window.initializeFirebase === 'function') {
+    await window.initializeFirebase();
+  }
+
+  // 2. ログイン状態の監視を開始
   if (typeof window.onAuthStateChangedListener === 'function') {
     window.onAuthStateChangedListener((user) => {
+      console.log("👤 認証状態:", user ? "ログイン中" : "未ログイン");
+      
       if (user) {
-        document.getElementById('user-info').textContent = `👤 ${user.displayName || user.email}`;
-        showScreen('screen-home');
-        updateStats();
+        // ログイン成功時：画面を表示
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-container').style.display = 'block';
+        
+        // ユーザー名などがあれば表示
+        const userInfo = document.getElementById('user-info');
+        if (userInfo) userInfo.textContent = `👤 ${user.displayName || user.email}`;
+        
+        // アプリのメイン機能を起動
+        initApp(); 
       } else {
+        // 未ログイン時：ログイン画面を表示
         document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('app-container').style.display = 'none';
       }
     });
   } else {
-    // オフライン・ゲスト状態
-    document.getElementById('login-screen').style.display = 'flex';
+    // Firebaseが読み込めていない場合
+    console.error("Firebase SDKが読み込めていません");
   }
 };
 
