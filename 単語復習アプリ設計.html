@@ -246,6 +246,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
 
+    <!-- ══ SETUP ═════════════════════════════════════════ -->
     <div class="screen" id="screen-setup">
       <div class="card">
         <div class="label">🎯 試験範囲の選択</div>
@@ -259,6 +260,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="slider-wrap" style="margin-bottom:10px;"><input type="range" id="range-from" min="0" max="282" value="0" oninput="updateRangeSliders()"></div>
         <div class="slider-wrap"><input type="range" id="range-to" min="0" max="282" value="282" oninput="updateRangeSliders()"></div>
       </div>
+
+      <!-- 👇追加：出題順のカード👇 -->
+      <div class="card">
+        <div class="label">出題順</div>
+        <div class="option-grid">
+          <button class="opt-btn selected" id="order-asc" onclick="setOrder('asc')">昇順</button>
+          <button class="opt-btn" id="order-rand" onclick="setOrder('random')">ランダム</button>
+        </div>
+      </div>
+      <!-- 👆ここまで追加👆 -->
+
       <button class="big-btn btn-primary" onclick="startStudy()">▶ 学習開始</button>
       <button class="big-btn btn-secondary" onclick="showScreen('screen-home')">← 戻る</button>
     </div>
@@ -586,7 +598,8 @@ const ALL_WORDS = RAW.trim().split('\n').map(line => {
 const state = {
   queue: [], current: 0, results: [],
   learnedCount: parseInt(localStorage.getItem('tanGO_learned')||'0'),
-  sessions: parseInt(localStorage.getItem('tanGO_sessions')||'0')
+  sessions: parseInt(localStorage.getItem('tanGO_sessions')||'0'),
+  order: 'asc' // ← この1行を追加！
 };
 
 // 🚀 画面ロード時の処理（認証状態を監視しつつテスト日をロード）
@@ -652,6 +665,37 @@ function updateRangeSliders() {
   const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
   document.getElementById('range-from-lbl').textContent = ALL_WORDS[lo].id;
   document.getElementById('range-to-lbl').textContent = ALL_WORDS[hi].id;
+}
+
+// ↓↓↓ 既存の updateRangeSliders() の下あたりに追加＆上書き ↓↓↓
+
+// 🔘 出題順を切り替える関数（追加）
+function setOrder(orderType) {
+  state.order = orderType;
+  document.getElementById('order-asc').classList.toggle('selected', orderType === 'asc');
+  document.getElementById('order-rand').classList.toggle('selected', orderType === 'random');
+}
+
+// 🚀 学習開始関数（上書き：選択された順番に従うように修正）
+function startStudy() {
+  const fi = parseInt(document.getElementById('range-from').value);
+  const ti = parseInt(document.getElementById('range-to').value);
+  const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
+  
+  // 範囲内の単語を取得
+  let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
+  
+  // 「ランダム」が選ばれていたらシャッフルする
+  if (state.order === 'random') {
+    queueList = queueList.sort(() => Math.random() - 0.5);
+  }
+  
+  state.queue = queueList;
+  state.current = 0; 
+  state.results = [];
+  
+  showScreen('screen-quiz'); 
+  renderQuestion();
 }
 
 function startStudy() {
