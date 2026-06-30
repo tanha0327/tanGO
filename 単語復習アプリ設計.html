@@ -11,10 +11,10 @@
 
 <script>
 // ==========================================
-// 外部JSファイルを使わず、ここに直接Firebaseの設定を書きます！
+// ⚠️⚠️⚠️ ご自身の firebaseConfig に書き換えてください ⚠️⚠️⚠️
 // ==========================================
 const firebaseConfig = {
-  apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
+  apiKey: "APIキーをここに入力", 
   authDomain: "tango-c36c0.firebaseapp.com",
   projectId: "tango-c36c0",
   storageBucket: "tango-c36c0.firebasestorage.app",
@@ -28,22 +28,21 @@ if (!firebase.apps.length) {
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
-console.log("✅ Firebase 準備完了 (合体版)");
+console.log("✅ Firebase 準備完了 (カウントダウンDB同期版)");
 
 let isGuest = false;
+let testDate = null;
+let countdownTimer = null;
 
-// 🔐 ログイン（Live Server用なのでポップアップを使用）
+// 🔐 ログイン（Live Server用ポップアップ）
 async function loginWithGoogle() {
-  console.log("🔘 ログインボタンが押されました");
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     await auth.signInWithPopup(provider);
-    console.log("✅ ログイン成功！");
-    // 状態を反映するためにリロード
     window.location.reload();
   } catch (error) {
     console.error("❌ ログインエラー:", error);
-    alert("ログインに失敗しました。Live Serverで開いているか確認してください。\n詳細: " + error.message);
+    alert("ログインに失敗しました。詳細: " + error.message);
   }
 }
 
@@ -57,6 +56,13 @@ function loginAsGuest() {
   document.getElementById('user-info').textContent = "👤 ゲストユーザー";
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
+  
+  // ゲスト用のローカル保存テスト日を読み込み
+  const savedDate = localStorage.getItem('tanGO_testdate');
+  if (savedDate) {
+    testDate = new Date(savedDate);
+    startCountdown();
+  }
   showScreen('screen-home');
   updateStats();
 }
@@ -74,7 +80,6 @@ async function saveScoreToLeaderboard(stats) {
       accuracy: stats.accuracy || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    console.log("✅ ランキングデータをクラウドに送信しました");
   } catch (e) { console.error("保存エラー:", e); }
 }
 
@@ -83,10 +88,7 @@ async function getGlobalLeaderboardFromCloud(limitCount = 3) {
   try {
     const snapshot = await db.collection('leaderboard').orderBy('learned', 'desc').limit(limitCount).get();
     return snapshot.docs.map(doc => doc.data());
-  } catch (e) {
-    console.error("取得エラー:", e);
-    return [];
-  }
+  } catch (e) { return []; }
 }
 </script>
 
@@ -128,6 +130,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .modal-btns { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:1rem; }
 .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .login-box { background: white; border-radius: 16px; padding: 2rem; max-width: 400px; width: 90%; text-align: center; }
+
+/* カウントダウン用デザイン */
+.countdown-card { background:linear-gradient(135deg,#1a237e,#1565c0,#0d47a1); border-radius:14px; padding:1rem; margin-bottom:0.8rem; color:white; text-align:center; box-shadow: 0 4px 12px rgba(13,71,161,0.2); }
+.countdown-days { font-size:48px; font-weight:800; line-height:1; }
+.countdown-hms { font-size:18px; font-weight:600; letter-spacing:1px; margin-top:4px; opacity:0.9; }
+.test-date-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:10px; transition: 0.2s; }
+.test-date-btn:hover { background:rgba(255,255,255,0.25); }
+.norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -135,7 +145,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <div style="font-size: 24px; font-weight: 700; margin-bottom: 1rem;">単語復習アプリ</div>
-    <div style="font-size: 13px; color: #666; margin-bottom: 2rem;">クラウドランキング対応版</div>
+    <div style="font-size: 13px; color: #666; margin-bottom: 2rem;">クラウド同期対応版</div>
     <button class="big-btn" style="background:white; border:2px solid #ddd; color:#333;" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
     <button class="big-btn btn-primary" onclick="loginAsGuest()">👤 ゲストで使用</button>
   </div>
@@ -164,6 +174,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
+  <div class="modal-overlay" id="testdate-modal">
+    <div class="modal-box">
+      <div class="modal-title">📅 テスト日を設定</div>
+      <div class="card" style="margin-bottom:1rem; padding:0.75rem;">
+        <div class="label">🎯 クイック選択</div>
+        <div class="option-grid">
+          <button class="opt-btn" onclick="setQuickTestDate('2026-07-03', '09:10')">一学期期末 (7/3 9:10)</button>
+        </div>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <input type="date" id="testdate-date" class="text-input">
+        <input type="time" id="testdate-time" class="text-input">
+      </div>
+      <div class="modal-btns">
+        <button class="big-btn btn-secondary" onclick="document.getElementById('testdate-modal').classList.remove('open')">戻る</button>
+        <button class="big-btn btn-primary" onclick="saveTestDate()">クラウドに保存</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="leaderboard-modal">
     <div class="modal-box" style="max-width:420px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -179,6 +209,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="display:flex;justify-content:space-between;margin-bottom:0.8rem;">
         <span id="user-info" style="font-size:12px;color:#666;"></span>
         <button class="exit-btn" onclick="logout()">🔓 ログアウト</button>
+      </div>
+      
+      <div class="countdown-card" id="countdown-card">
+        <div style="font-size:10px; opacity:0.8; margin-bottom:4px;" id="countdown-label">テスト日を設定してください</div>
+        <div style="display:flex; justify-content:center; align-items:baseline;">
+          <div class="countdown-days" id="countdown-days">--</div>
+          <div style="font-size:12px; margin-left:4px;">日</div>
+        </div>
+        <div class="countdown-hms" id="countdown-hms">--:--:--</div>
+        <div id="norma-area"></div>
+        <button class="test-date-btn" onclick="openTestDateModal()">📅 目標日時を設定する</button>
       </div>
       
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
@@ -548,30 +589,31 @@ const state = {
   sessions: parseInt(localStorage.getItem('tanGO_sessions')||'0')
 };
 
-// 🚀 画面ロード時の処理（認証状態を監視）
+// 🚀 画面ロード時の処理（認証状態を監視しつつテスト日をロード）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
-  auth.onAuthStateChanged((user) => {
-    console.log("👤 認証状態:", user ? "ログイン中 (" + user.displayName + ")" : "未ログイン");
-    
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
-      // ユーザー情報の保存
-      db.collection('users').doc(user.uid).set({
-        uid: user.uid,
-        displayName: user.displayName || '名無し',
-        email: user.email,
-        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true }).catch(e => console.error("ユーザー登録エラー:", e));
-
-      // 画面切り替え
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
-      
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `👤 ${user.displayName || user.email}`;
       
-      updateStats(); // ホーム画面の更新
+      // Firestoreからユーザーのテスト日を読み込む
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists && userDoc.data().testDate) {
+          testDate = new Date(userDoc.data().testDate);
+        } else {
+          // Firebaseに無い場合はローカルから引き継ぎ
+          const savedLocal = localStorage.getItem('tanGO_testdate');
+          if (savedLocal) testDate = new Date(savedLocal);
+        }
+      } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
+
+      startCountdown();
+      updateStats();
     } else if (!isGuest) {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app-container').style.display = 'none';
@@ -667,7 +709,6 @@ function finishQuiz(isExit) {
   localStorage.setItem('tanGO_learned', state.learnedCount);
   localStorage.setItem('tanGO_sessions', state.sessions);
 
-  // クラウド（Firebase）に成績を送信
   saveScoreToLeaderboard({
     learned: state.learnedCount,
     totalAnswers: state.learnedCount + 10,
@@ -725,6 +766,105 @@ function openLeaderboardModal() {
       }).join('');
     }
   });
+}
+
+// 📅 カウントダウン関連の関数
+function openTestDateModal() {
+  document.getElementById('testdate-modal').classList.add('open');
+  if (testDate) {
+    const y = testDate.getFullYear();
+    const m = String(testDate.getMonth() + 1).padStart(2, '0');
+    const d = String(testDate.getDate()).padStart(2, '0');
+    const h = String(testDate.getHours()).padStart(2, '0');
+    const min = String(testDate.getMinutes()).padStart(2, '0');
+    document.getElementById('testdate-date').value = `${y}-${m}-${d}`;
+    document.getElementById('testdate-time').value = `${h}:${min}`;
+  }
+}
+
+function setQuickTestDate(dateStr, timeStr) {
+  document.getElementById('testdate-date').value = dateStr;
+  document.getElementById('testdate-time').value = timeStr;
+}
+
+async function saveTestDate() {
+  const dateVal = document.getElementById('testdate-date').value;
+  const timeVal = document.getElementById('testdate-time').value || '12:00';
+  if (!dateVal) { alert("日付を選択してください"); return; }
+  
+  testDate = new Date(`${dateVal}T${timeVal}:00`);
+  
+  // クラウドに保存（ゲスト以外）
+  if (!isGuest && auth.currentUser) {
+    try {
+      await db.collection('users').doc(auth.currentUser.uid).set({
+        testDate: testDate.toISOString()
+      }, { merge: true });
+      console.log("✅ テスト日をクラウドに保存しました");
+    } catch(e) { console.error("テスト日保存エラー:", e); }
+  } else {
+    // ゲスト用フォールバック
+    localStorage.setItem('tanGO_testdate', testDate.toISOString());
+  }
+
+  document.getElementById('testdate-modal').classList.remove('open');
+  startCountdown();
+}
+
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  tickCountdown(); // すぐに1回更新
+  countdownTimer = setInterval(tickCountdown, 1000);
+}
+
+function tickCountdown() {
+  const labelEl = document.getElementById('countdown-label');
+  const daysEl = document.getElementById('countdown-days');
+  const hmsEl = document.getElementById('countdown-hms');
+  const normaEl = document.getElementById('norma-area');
+  
+  if (!testDate) {
+    labelEl.textContent = 'テスト日を設定してください';
+    daysEl.textContent = '--';
+    hmsEl.textContent = '--:--:--';
+    normaEl.innerHTML = '';
+    return;
+  }
+
+  const now = new Date();
+  const diff = testDate - now;
+
+  if (diff <= 0) {
+    labelEl.textContent = 'テスト当日！';
+    daysEl.textContent = '0';
+    hmsEl.textContent = '00:00:00';
+    normaEl.innerHTML = '<div class="norma-badge">🎯 頑張れ！</div>';
+    return;
+  }
+
+  const totalSec = Math.floor(diff / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  
+  const pad = n => String(n).padStart(2,'0');
+  const y = testDate.getFullYear();
+  const mo = testDate.getMonth() + 1;
+  const d = testDate.getDate();
+  const h = testDate.getHours();
+  const mi = testDate.getMinutes();
+  
+  labelEl.textContent = `テストまで（${y}/${pad(mo)}/${pad(d)} ${pad(h)}:${pad(mi)}）`;
+  daysEl.textContent = days;
+  hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+
+  // ノルマ計算（未学習の単語数 ÷ 残り日数）
+  const TOTAL = ALL_WORDS.length;
+  const learned = state.learnedCount;
+  const remaining = Math.max(0, TOTAL - learned);
+  const norma = Math.ceil(remaining / (days + 1));
+  normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
 }
 </script>
 </body>
