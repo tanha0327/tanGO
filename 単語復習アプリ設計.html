@@ -669,23 +669,23 @@ function updateRangeSliders() {
 
 // ↓↓↓ 既存の updateRangeSliders() の下あたりに追加＆上書き ↓↓↓
 
-// 🔘 出題順を切り替える関数（追加）
+// 🔘 出題順を切り替える関数
 function setOrder(orderType) {
   state.order = orderType;
   document.getElementById('order-asc').classList.toggle('selected', orderType === 'asc');
   document.getElementById('order-rand').classList.toggle('selected', orderType === 'random');
 }
 
-// 🚀 学習開始関数（上書き：選択された順番に従うように修正）
+// 🚀 学習開始関数（これ1つだけにします！）
 function startStudy() {
   const fi = parseInt(document.getElementById('range-from').value);
   const ti = parseInt(document.getElementById('range-to').value);
   const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
   
-  // 範囲内の単語を取得
+  // まずは順番通り（昇順）に単語リストを作る
   let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
   
-  // 「ランダム」が選ばれていたらシャッフルする
+  // 「ランダム」ボタンが選ばれていた時だけシャッフルする
   if (state.order === 'random') {
     queueList = queueList.sort(() => Math.random() - 0.5);
   }
@@ -696,14 +696,6 @@ function startStudy() {
   
   showScreen('screen-quiz'); 
   renderQuestion();
-}
-
-function startStudy() {
-  const fi=parseInt(document.getElementById('range-from').value), ti=parseInt(document.getElementById('range-to').value);
-  const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
-  state.queue = ALL_WORDS.slice(lo, hi+1).map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5);
-  state.current = 0; state.results = [];
-  showScreen('screen-quiz'); renderQuestion();
 }
 
 function startRandomN() {
