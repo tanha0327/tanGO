@@ -590,6 +590,7 @@ const state = {
 };
 
 // 🚀 画面ロード時の処理（認証状態を監視しつつテスト日をロード）
+// 🚀 画面ロード時の処理（成績とテスト日をクラウドから完全同期）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
@@ -600,15 +601,29 @@ window.onload = () => {
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `👤 ${user.displayName || user.email}`;
       
-      // Firestoreからユーザーのテスト日を読み込む
+      // ☁️ Firestoreからユーザーの【テスト日】と【成績】を読み込む
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.exists && userDoc.data().testDate) {
-          testDate = new Date(userDoc.data().testDate);
-        } else {
-          // Firebaseに無い場合はローカルから引き継ぎ
-          const savedLocal = localStorage.getItem('tanGO_testdate');
-          if (savedLocal) testDate = new Date(savedLocal);
+        if (userDoc.exists) {
+          const data = userDoc.data();
+          
+          // テスト日の同期
+          if (data.testDate) {
+            testDate = new Date(data.testDate);
+          } else {
+            const savedLocal = localStorage.getItem('tanGO_testdate');
+            if (savedLocal) testDate = new Date(savedLocal);
+          }
+
+          // 成績の同期（クラウドのデータが多ければローカルを上書きする）
+          if (data.learnedCount !== undefined) {
+            state.learnedCount = Math.max(state.learnedCount, data.learnedCount);
+            localStorage.setItem('tanGO_learned', state.learnedCount);
+          }
+          if (data.sessions !== undefined) {
+            state.sessions = Math.max(state.sessions, data.sessions);
+            localStorage.setItem('tanGO_sessions', state.sessions);
+          }
         }
       } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
 
