@@ -721,14 +721,26 @@ function finishQuiz(isExit) {
   const total = state.results.length;
   state.learnedCount += correctCount;
   
+  // ローカルに保存
   localStorage.setItem('tanGO_learned', state.learnedCount);
   localStorage.setItem('tanGO_sessions', state.sessions);
 
-  saveScoreToLeaderboard({
-    learned: state.learnedCount,
-    totalAnswers: state.learnedCount + 10,
-    accuracy: Math.round((correctCount / total) * 100)
-  });
+  // ☁️ クラウドに完全保存（ゲスト以外）
+  if (!isGuest && auth.currentUser) {
+    // 1. 個人の成績データベースに保存（追加！）
+    db.collection('users').doc(auth.currentUser.uid).set({
+      learnedCount: state.learnedCount,
+      sessions: state.sessions,
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.error("個人成績の保存エラー:", e));
+
+    // 2. ランキングデータベースに保存
+    saveScoreToLeaderboard({
+      learned: state.learnedCount,
+      totalAnswers: state.learnedCount + 10,
+      accuracy: Math.round((correctCount / total) * 100)
+    });
+  }
 
   if (isExit) { showScreen('screen-home'); updateStats(); return; }
 
