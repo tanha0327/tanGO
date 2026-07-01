@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>単語復習アプリ</title>
+<title>tanGO - 周回進捗同期版</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
@@ -28,7 +28,7 @@ if (!firebase.apps.length) {
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
-console.log("✅ Firebase 準備完了 (共通テスト同期版)");
+console.log("✅ Firebase 準備完了 (周回進捗・正解率同期システム)");
 
 // グローバル変数
 let isGuest = false;
@@ -36,7 +36,14 @@ let testDate = null;
 let countdownTimer = null;
 let currentNickname = "";
 let ALL_WORDS = [];
-let activeRange = "final"; // 🌟 共通の試験範囲（'midterm' または 'final'）
+
+// 🌟 新しい周回用ユーザーデータ状態
+let activeRange = "final"; 
+let uCurrentRound = 1;      // 現在何周目か
+let uRoundAnswers = [];     // 現在の周回で既に解いた単語IDのリスト
+let uTotalAnswers = 0;      // 通算解答数（正解率用）
+let uTotalCorrect = 0;      // 通算正解数（正解率用）
+let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 </script>
 
 <style>
@@ -54,9 +61,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .btn-primary { background: #2D7DD2; color: white; }
 .btn-secondary { background: white; color: #1a1a1a; border: 1px solid #e0e0da; }
 .btn-wrong-red { background: #c62828; color: white; font-size: 20px; font-weight: 700; }
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 0.8rem; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 0.8rem; }
 .stat-card { background: white; border: 1px solid #e5e5e0; border-radius: 10px; padding: 0.75rem; text-align: center; }
-.stat-num { font-size: 24px; font-weight: 700; color: #1a1a1a; }
+.stat-num { font-size: 22px; font-weight: 700; color: #1a1a1a; }
 .stat-lbl { font-size: 11px; color: #888; margin-top: 3px; }
 .quiz-word { font-size: 28px; font-weight: 700; text-align: center; padding: 1.5rem 1rem 0.5rem; color: #1a1a1a; }
 .quiz-hint { font-size: 13px; color: #888; text-align: center; margin-bottom: 1rem; }
@@ -65,7 +72,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .result-correct { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
 .result-wrong { background: #fce4ec; color: #880e4f; border: 1px solid #f48fb1; }
 .result-partial { background: #fff8e1; color: #e65100; border: 1px solid #ffcc80; }
-.progress-wrap { height: 4px; background: #e8e8e4; border-radius: 99px; margin-bottom: 1rem; overflow: hidden; }
+.progress-wrap { height: 6px; background: #e8e8e4; border-radius: 99px; margin-bottom: 1rem; overflow: hidden; }
 .progress-bar { height: 100%; background: #2D7DD2; border-radius: 99px; transition: width 0.3s; }
 .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .exit-btn { padding: 6px 12px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 12px; color: #888; }
@@ -102,7 +109,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <div style="font-size: 24px; font-weight: 700; margin-bottom: 1rem;">単語復習アプリ</div>
-    <div style="font-size: 13px; color: #666; margin-bottom: 2rem;">クラウド完全同期版</div>
+    <div style="font-size: 28px; font-weight: 900; color: #2D7DD2; font-family: Impact; margin-bottom: 1.5rem;">tanGO!!</div>
     <button class="big-btn" style="background:white; border:2px solid #ddd; color:#333;" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
     <button class="big-btn btn-primary" onclick="loginAsGuest()">👤 ゲストで使用</button>
   </div>
@@ -131,19 +138,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="modal-overlay" id="exit-modal">
     <div class="modal-box">
-      <div class="modal-title">途中退出しますか？</div>
+      <div class="modal-title">演習を中断しますか？</div>
+      <div style="font-size:12px; color:#666; text-align:center; margin-bottom:10px;">ここまでの進捗はクラウドに自動保存されています。</div>
       <div class="modal-btns">
         <button class="big-btn btn-secondary" onclick="document.getElementById('exit-modal').classList.remove('open')">続ける</button>
-        <button class="big-btn btn-wrong-red" onclick="finishQuiz(true)">退出して保存</button>
+        <button class="big-btn btn-wrong-red" onclick="exitQuizDirect()">中断してホームへ</button>
       </div>
     </div>
   </div>
 
   <div class="modal-overlay" id="random-modal">
     <div class="modal-box">
-      <div class="modal-title">🎲 ランダムN問</div>
+      <div class="modal-title">🎲 テスト範囲からランダムN問</div>
       <div style="text-align:center; font-size:22px; font-weight:700; color:#2D7DD2; margin-bottom:4px;"><span id="random-n-val">50</span>問</div>
-      <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="283" value="50" oninput="document.getElementById('random-n-val').textContent=this.value"></div>
+      <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="50" oninput="document.getElementById('random-n-val').textContent=this.value"></div>
       <div class="modal-btns" style="margin-top:20px;">
         <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.remove('open')">戻る</button>
         <button class="big-btn btn-primary" onclick="startRandomN()">開始</button>
@@ -153,28 +161,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="modal-overlay" id="testdate-modal">
     <div class="modal-box">
-      <div class="modal-title">📅 共通テスト・範囲の設定</div>
-      <div style="font-size:11px; color:#666; text-align:center; margin-bottom:12px;">ここで設定した内容は、アプリを使う全員に同期されます。</div>
-      <div class="card" style="margin-bottom:1rem; padding:0.75rem;">
-        <div class="label">🎯 クイック選択</div>
-        <div class="option-grid">
-          <button class="opt-btn" onclick="setQuickTestDate('2026-07-03', '09:10', 'final')">一学期期末 (7/3 9:10 - 期末)</button>
-        </div>
+      <div class="modal-title">📅 クラス共通の目標設定</div>
+      <div style="font-size:12px; color:#666; text-align:center; margin-bottom:12px;">
+        ここで選んだテストと範囲は、<br><b>ログインしている全員の画面に全自動で同期</b>されます！
       </div>
-      <div style="margin-bottom:1rem;">
-        <div class="label">📅 試験日</div>
-        <input type="date" id="testdate-date" class="text-input">
-        <input type="time" id="testdate-time" class="text-input">
-        
-        <div class="label" style="margin-top:8px;">🎯 対象範囲</div>
-        <div class="option-grid">
-          <button class="opt-btn selected" id="pop-range-mid" onclick="setPopupRange('midterm')">中間 (1401〜1541)</button>
-          <button class="opt-btn" id="pop-range-fin" onclick="setPopupRange('final')">期末 (1542〜1683)</button>
-        </div>
+      
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button class="big-btn btn-primary" onclick="setAndSaveSharedTest('一学期期末', '2026-07-03T09:10:00', 'final')">🎯 一学期期末 (7/3 9:10) を全員にセット</button>
+        <button class="big-btn btn-secondary" onclick="setAndSaveSharedTest('一学期中間', '2026-05-20T09:00:00', 'midterm')">🔙 一学期中間 (復習用) に戻す</button>
       </div>
-      <div class="modal-btns">
-        <button class="big-btn btn-secondary" onclick="document.getElementById('testdate-modal').classList.remove('open')">戻る</button>
-        <button class="big-btn btn-primary" onclick="saveTestDate()">全員と同期保存</button>
+
+      <div class="modal-btns" style="margin-top:16px;">
+        <button class="big-btn btn-secondary" style="grid-column: span 2;" onclick="document.getElementById('testdate-modal').classList.remove('open')">キャンセル</button>
       </div>
     </div>
   </div>
@@ -182,7 +180,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <div class="modal-overlay" id="leaderboard-modal">
     <div class="modal-box" style="max-width:420px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-        <div class="modal-title" style="margin:0;">🏆 全体ランキング</div>
+        <div class="modal-title" style="margin:0;">🏆 全体進捗ランキング</div>
         <button onclick="document.getElementById('leaderboard-modal').classList.remove('open')" style="border:none;background:none;font-size:24px;cursor:pointer;">×</button>
       </div>
       <div id="leaderboard-content-full"></div>
@@ -207,63 +205,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
         <div class="countdown-hms" id="countdown-hms">--:--:--</div>
         <div id="norma-area"></div>
-        <button class="test-date-btn" onclick="openTestDateModal()">📅 目標・範囲を設定する</button>
+        <button class="test-date-btn" onclick="openTestDateModal()">📅 管理者用: 目標・範囲を変更する</button>
       </div>
       
+      <div class="card" style="background: #fff;">
+        <div class="label">📊 あなたの現在の学習進捗</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+          <div style="font-size: 20px; font-weight: 700; color: #2D7DD2;" id="home-progress-text">1周目 0%</div>
+          <div style="font-size: 13px; color: #666;" id="home-progress-count">(0 / 142語)</div>
+        </div>
+        <div class="progress-wrap" style="margin-bottom: 4px;"><div class="progress-bar" id="home-progress-bar" style="width:0%"></div></div>
+      </div>
+
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
-        <div class="label" style="margin-bottom:10px;">👑 クラウドトップ3 (タップで詳細)</div>
+        <div class="label" style="margin-bottom:10px;">👑 クラウド進捗トップ3 (タップで詳細)</div>
         <div id="home-leaderboard" style="font-size:14px;color:#333;line-height:1.6;"></div>
       </div>
       
       <div class="stat-grid">
         <div class="stat-card">
-          <div class="stat-num" id="stat-total">0</div><div class="stat-lbl">覚えた単語</div>
+          <div class="stat-num" id="stat-round-count">1</div><div class="stat-lbl">現在の周回</div>
         </div>
         <div class="stat-card">
-          <div class="stat-num" id="stat-sessions">0</div><div class="stat-lbl">セッション</div>
+          <div class="stat-num" id="stat-accuracy">0%</div><div class="stat-lbl">通算正解率</div>
         </div>
         <div class="stat-card">
-          <div class="stat-num" id="stat-review-count" style="color:#c62828;">0</div><div class="stat-lbl">復習待ち</div>
+          <div class="stat-num" id="stat-total-solved">0</div><div class="stat-lbl">総解答回数</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
-        <button class="big-btn btn-primary" onclick="startStudyDirect()">✏️ 通常演習をスタート</button>
-        <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.add('open')">🎲 テスト範囲からランダムN問</button>
+      <div style="margin-bottom:1rem;">
+        <button class="big-btn btn-primary" style="padding: 15px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(45,125,210,0.3);" id="btn-main-study" onclick="startRoundStudy()">🚀 1周目をスタート</button>
+        <button class="big-btn btn-secondary" onclick="openRandomModal()">🎲 テスト範囲からランダムN問</button>
       </div>
-      <div style="text-align:center;"><button class="exit-btn" style="width:100%; padding:8px;" onclick="showScreen('screen-setup')">⚙️ 細かく手動で範囲調整する</button></div>
-    </div>
-
-    <div class="screen" id="screen-setup">
-      <div class="card">
-        <div class="label">🎯 試験範囲の選択</div>
-        <div class="option-grid">
-          <button class="opt-btn" onclick="setTestRange('midterm')">中間 (1401〜1541)</button>
-          <button class="opt-btn" onclick="setTestRange('final')">期末 (1542〜1683)</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="label">範囲調整 (No.<span id="range-from-lbl">1401</span> 〜 <span id="range-to-lbl">1683</span>)</div>
-        <div class="slider-wrap" style="margin-bottom:10px;"><input type="range" id="range-from" min="0" max="282" value="0" oninput="updateRangeSliders()"></div>
-        <div class="slider-wrap"><input type="range" id="range-to" min="0" max="282" value="282" oninput="updateRangeSliders()"></div>
-      </div>
-      
-      <div class="card">
-        <div class="label">出題順</div>
-        <div class="option-grid">
-          <button class="opt-btn selected" id="order-asc" onclick="setOrder('asc')">昇順</button>
-          <button class="opt-btn" id="order-rand" onclick="setOrder('random')">ランダム</button>
-        </div>
-      </div>
-
-      <button class="big-btn btn-primary" onclick="startStudy()">▶ 学習開始</button>
-      <button class="big-btn btn-secondary" onclick="showScreen('screen-home')">← 戻る</button>
     </div>
 
     <div class="screen" id="screen-quiz">
       <div class="quiz-header">
         <span id="quiz-counter" style="font-size:13px;color:#888;"></span>
-        <button class="exit-btn" onclick="document.getElementById('exit-modal').classList.add('open')">✕ 途中退出</button>
+        <button class="exit-btn" onclick="document.getElementById('exit-modal').classList.add('open')">✕ 中断して退出</button>
       </div>
       <div class="progress-wrap"><div class="progress-bar" id="quiz-progress" style="width:0%"></div></div>
       <div class="card">
@@ -281,10 +261,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="screen" id="screen-result">
       <div class="card" style="text-align:center;padding:2rem;">
         <div style="font-size:40px;margin-bottom:8px;" id="result-emoji">🎉</div>
-        <div style="font-size:22px;font-weight:700;" id="result-title">完了！</div>
-        <div style="font-size:14px;color:#888;" id="result-sub"></div>
+        <div style="font-size:22px;font-weight:700;" id="result-title">1周目 クリア！</div>
+        <div style="font-size:14px;color:#888;margin-top:8px;" id="result-sub">全単語を1回ずつ解破しました！</div>
       </div>
-      <button class="big-btn btn-primary" onclick="showScreen('screen-home');updateStats();">🏠 ホームへ戻る</button>
+      <button class="big-btn btn-primary" id="btn-result-home" onclick="showScreen('screen-home');refreshUI();">🏠 ホームへ戻る</button>
     </div>
   </div>
 </div>
@@ -361,7 +341,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1468	election	選挙
 1469	official	公の，公式の／公務員，役人，職員
 1470	moral	道徳の，道徳的な／《(複)で》道徳
-1471	investigation	調査，捜捜
+1471	investigation	調査，捜査
 1472	data	資料，データ，情報
 1473	aspect	面，様相
 1474	factor	要因，要素
@@ -512,7 +492,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1619	no longer	もはや…でない，もはや…しない
 1620	not … at all	少しも…ない，全然…ない
 1621	not always …	いつも…とは限らない，必ずしも…とは限らない
-1622	anything but …	《do – but…》…以外なら何でもする／決して…ではない
+1622	anything but …	《do – but…}…以外なら何でもする／決して…ではない
 1623	nothing but …	ただ…だけ，…にすぎない／《do – but…》…してばかりいる
 1624	far from	……からはほど遠い，少しも…でない
 1625	by no means …	決して…ない，まったく…ない
@@ -558,7 +538,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1665	narrow	(幅が)狭い，細い
 1666	specific	明確な，特定の，具体的な／仕様(書)，明細(書)
 1667	fortunately	幸運にも
-1668	frankly	率直に
+1668	frankly	率率に
 1669	anyway	とにかく，いずれにせよ
 1670	therefore	それゆえに，それで
 1671	eventually	最後には，ついに
@@ -575,14 +555,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1682	combination	組み合わせ，結合
 1683	evidence	証拠`;
 
-const state = {
-  queue: [], current: 0, results: [],
-  learnedCount: parseInt(localStorage.getItem('tanGO_learned')||'0'),
-  sessions: parseInt(localStorage.getItem('tanGO_sessions')||'0'),
-  order: 'asc'
-};
-
-// ☁️ データベース（Firestore）から単語を取得
+// ☁️ データベース（Firestore）から単語を取得＆自動登録
 async function initDictionary() {
   try {
     const midDoc = await db.collection('vocabulary').doc('midterm').get();
@@ -600,14 +573,10 @@ async function initDictionary() {
       await db.collection('vocabulary').doc('midterm').set({ title: "中間 (1401〜1541)", words: ALL_WORDS.slice(0, 141) });
       await db.collection('vocabulary').doc('final').set({ title: "期末 (1542〜1683)", words: ALL_WORDS.slice(141) });
     }
-
-    document.getElementById('range-from').max = ALL_WORDS.length - 1;
-    document.getElementById('range-to').max = ALL_WORDS.length - 1;
-    updateRangeSliders();
   } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
-// 🚀 画面ロード時の処理（テスト日と範囲を共通ドキュメントから同期！）
+// 🚀 画面ロード時の処理（テスト日・範囲、個人の周回データをクラウドから完全同期）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
@@ -616,10 +585,9 @@ window.onload = () => {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
       
-      // 1. まず単語DBを構築
       await initDictionary();
       
-      // 2. 🌟 共通の『テスト目標・範囲』をクラウドの同一の場所から取得！
+      // 1. クラス共通の目標日時と範囲を取得
       try {
         const targetDoc = await db.collection('vocabulary').doc('active_test').get();
         if (targetDoc.exists) {
@@ -627,22 +595,21 @@ window.onload = () => {
           if (config.testDate) testDate = new Date(config.testDate);
           if (config.activeRange) activeRange = config.activeRange;
         }
-      } catch(e) { console.error("共通テスト目標の取得に失敗:", e); }
+      } catch(e) { console.error("共通目標の取得に失敗:", e); }
       
-      // 3. 個人の成績を読み込む
+      // 2. ユーザー個人の【周回進捗データ】を完全読み込み
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           const data = userDoc.data();
           if (data.nickname) currentNickname = data.nickname;
-          if (data.learnedCount !== undefined) {
-            state.learnedCount = Math.max(state.learnedCount, data.learnedCount);
-            localStorage.setItem('tanGO_learned', state.learnedCount);
-          }
-          if (data.sessions !== undefined) {
-            state.sessions = Math.max(state.sessions, data.sessions);
-            localStorage.setItem('tanGO_sessions', state.sessions);
-          }
+          
+          // 🌟 周回データの同期
+          if (data.currentRound !== undefined) uCurrentRound = data.currentRound;
+          if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers;
+          if (data.totalAnswers !== undefined) uTotalAnswers = data.totalAnswers;
+          if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect;
+          if (data.wordHistory !== undefined) uWordHistory = data.wordHistory;
         }
       } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
 
@@ -651,7 +618,7 @@ window.onload = () => {
       if (!isGuest) document.getElementById('btn-edit-nickname').style.display = 'block';
 
       startCountdown();
-      updateStats();
+      refreshUI(); // 🌟 ホーム画面の表示を最新状態に更新
     } else if (!isGuest) {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app-container').style.display = 'none';
@@ -664,86 +631,112 @@ function showScreen(id) {
   document.getElementById(id).classList.add('visible');
 }
 
-// 手動調整用
-function setTestRange(type) {
-  if (type === 'midterm') { document.getElementById('range-from').value = 0; document.getElementById('range-to').value = 140; }
-  if (type === 'final') { document.getElementById('range-from').value = 141; document.getElementById('range-to').value = 282; }
-  updateRangeSliders();
-}
-
-function updateRangeSliders() {
-  const fi=parseInt(document.getElementById('range-from').value), ti=parseInt(document.getElementById('range-to').value);
-  const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
-  if(ALL_WORDS.length > 0) {
-    document.getElementById('range-from-lbl').textContent = ALL_WORDS[lo].id;
-    document.getElementById('range-to-lbl').textContent = ALL_WORDS[hi].id;
+// 📊 画面表示を最新データで再計算して書き換える関数
+function refreshUI() {
+  const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
+  
+  // 今の周回での進捗率（％）
+  const progressPercent = Math.floor((uRoundAnswers.length / rangeTotal) * 100);
+  
+  // 正解率の計算
+  const accuracyPercent = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+  
+  // 1. ホーム画面の進捗テキストとプログレスバーを更新
+  document.getElementById('home-progress-text').textContent = `${uCurrentRound}周目 ${progressPercent}%`;
+  document.getElementById('home-progress-count').textContent = `(${uRoundAnswers.length} / ${rangeTotal}語)`;
+  document.getElementById('home-progress-bar').style.width = `${progressPercent}%`;
+  
+  // 2. 下部の統計数字を更新
+  document.getElementById('stat-round-count').textContent = `${uCurrentRound}周目`;
+  document.getElementById('stat-accuracy').textContent = `${accuracyPercent}%`;
+  document.getElementById('stat-total-solved').textContent = `${uTotalAnswers}回`;
+  
+  // 3. メインボタンの文字を状態によって自動変更！
+  const mainBtn = document.getElementById('btn-main-study');
+  if (uRoundAnswers.length === 0) {
+    mainBtn.textContent = `🚀 ${uCurrentRound}周目をスタート`;
+  } else {
+    const remain = rangeTotal - uRoundAnswers.length;
+    mainBtn.textContent = `✏️ ${uCurrentRound}周目の続きから再開 (残り${remain}問)`;
   }
+  
+  updateLeaderboardDisplay();
 }
 
-function setOrder(orderType) {
-  state.order = orderType;
-  document.getElementById('order-asc').classList.toggle('selected', orderType === 'asc');
-  document.getElementById('order-rand').classList.toggle('selected', orderType === 'random');
+// 🎲 ランダムN問の最大値を現在の範囲で自動変動させる
+function openRandomModal() {
+  const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
+  const slider = document.getElementById('random-n-slider');
+  slider.max = rangeTotal;
+  if(parseInt(slider.value) > rangeTotal) slider.value = rangeTotal;
+  document.getElementById('random-n-val').textContent = slider.value;
+  document.getElementById('random-modal').classList.add('open');
 }
 
-// 🌟 ホーム画面から「通常演習をスタート」を押したときの、爆速自動セット関数！
-function startStudyDirect() {
-  if (!ALL_WORDS || ALL_WORDS.length === 0) return;
-  // クラウドと同期している範囲（中間か期末）に合わせて自動でインデックスを切り替え
+// 🚀 ユーザーの進捗に合わせた【周回演習】の開始処理（やってない問題だけを昇順で抽出！）
+// 🚀 ユーザーの進捗に合わせた【周回演習】の開始処理（安全装置付き！）
+let isRandomMode = false; 
+function startRoundStudy() {
+  // 🚨 安全対策1：単語データがクラウドからまだ届いていない場合
+  if (!ALL_WORDS || ALL_WORDS.length === 0) {
+    alert("⏳ 単語データをクラウドから読み込み中です。\n1〜2秒だけ待ってからもう一度押してください！\n（何回押してもダメな場合は、一度 Ctrl+F5 で再読み込みしてください）");
+    return;
+  }
+  isRandomMode = false;
+
   const lo = (activeRange === 'midterm') ? 0 : 141;
   const hi = (activeRange === 'midterm') ? 140 : 282;
+  const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
   
-  let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
-  if (state.order === 'random') queueList = queueList.sort(() => Math.random() - 0.5);
+  // 現在のテスト範囲の単語を抜き出す
+  const rangeWords = ALL_WORDS.slice(lo, hi + 1);
   
-  state.queue = queueList;
+  // まだ解いていない単語だけを抽出
+  const unsubmittedWords = rangeWords.filter(w => !uRoundAnswers.includes(w.id));
+  
+  // 🚨 安全対策2：もし未解答の単語が0個（すでに100%）なのにボタンを押した場合
+  if (unsubmittedWords.length === 0) {
+    alert("🎉 この周回の単語はすべて解き終わっています！\n自動的に次の周回にリセットして進みます！");
+    uCurrentRound++;
+    uRoundAnswers = [];
+    if (!isGuest && auth.currentUser) {
+      db.collection('users').doc(auth.currentUser.uid).set({
+        currentRound: uCurrentRound,
+        roundAnswers: uRoundAnswers
+      }, { merge: true });
+    }
+    refreshUI();
+    return;
+  }
+  
+  state.queue = unsubmittedWords.map(w => ({ word: w, dir: 'jp-en' }));
   state.current = 0;
   state.results = [];
-  
+
   playTangoEffect(() => {
     showScreen('screen-quiz');
     renderQuestion();
   });
 }
 
-// 手動画面からの学習開始
-function startStudy() {
-  if (!ALL_WORDS || ALL_WORDS.length === 0) return;
-  const fi = parseInt(document.getElementById('range-from').value);
-  const ti = parseInt(document.getElementById('range-to').value);
-  const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
-  
-  let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
-  if (state.order === 'random') queueList = queueList.sort(() => Math.random() - 0.5);
-  
-  state.queue = queueList;
-  state.current = 0; 
-  state.results = [];
-  
-  playTangoEffect(() => {
-    showScreen('screen-quiz'); 
-    renderQuestion();
-  });
-}
-
-// 🌟 クラウドに同期されたテスト範囲から自動抽出するランダムN問！
+// 🎲 ランダムN問（息抜き・腕試し用）
 function startRandomN() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) return;
-  const n = parseInt(document.getElementById('random-n-slider').value);
+  isRandomMode = true;
   
-  // 同期中のテスト範囲からのみ抽出する
+  const n = parseInt(document.getElementById('random-n-slider').value);
   const lo = (activeRange === 'midterm') ? 0 : 141;
   const hi = (activeRange === 'midterm') ? 140 : 282;
   const rangeWords = ALL_WORDS.slice(lo, hi + 1);
   
   state.queue = rangeWords.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
-  state.current = 0; 
+  state.current = 0;
   state.results = [];
   
   document.getElementById('random-modal').classList.remove('open');
   
   playTangoEffect(() => {
-    showScreen('screen-quiz'); 
+    showScreen('screen-quiz');
     renderQuestion();
   });
 }
@@ -753,7 +746,7 @@ function renderQuestion() {
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
   document.getElementById('quiz-word').textContent = w.jp;
-  document.getElementById('quiz-hint').textContent = '英語で答えてください';
+  document.getElementById('quiz-hint').textContent = `No.${w.id} — 英語で答えてください`;
   document.getElementById('quiz-answer').value = '';
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
@@ -762,9 +755,12 @@ function renderQuestion() {
   setTimeout(()=>document.getElementById('quiz-answer').focus(), 50);
 }
 
-function submitAnswer() {
+// 🌟 解答が送信された瞬間に、裏でクラウドデータベースへリアルタイム保存！
+async function submitAnswer() {
   const ans = document.getElementById('quiz-answer').value.trim().toLowerCase();
-  const correct = state.queue[state.current].word.en;
+  const currentItem = state.queue[state.current];
+  const correct = currentItem.word.en;
+  const wordId = currentItem.word.id;
   
   let grade = 'wrong';
   if (ans === correct) grade = 'correct';
@@ -772,9 +768,23 @@ function submitAnswer() {
 
   state.results.push({ grade });
   
+  // 統計のインクリメント
+  uTotalAnswers++;
+  if(grade === 'correct') uTotalCorrect++;
+  
+  // 各単語の履歴更新
+  if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0 };
+  uWordHistory[wordId].solved++;
+  if (grade === 'wrong') uWordHistory[wordId].wrong++;
+
+  // 🌟 周回モードなら、解いたフラグ（uRoundAnswers）に追加
+  if (!isRandomMode && !uRoundAnswers.includes(wordId)) {
+    uRoundAnswers.push(wordId);
+  }
+  
+  // 1. 正解表示を画面に出す
   const cls = grade==='correct'?'result-correct':grade==='partial'?'result-partial':'result-wrong';
   const lbl = grade==='correct'?'✓ 正解！':grade==='partial'?'△ 部分正解':'✗ 不正解';
-  
   const resEl = document.getElementById('quiz-result');
   resEl.innerHTML = `<div class="result-box ${cls}"><strong>${lbl}</strong><br>模範解答: <strong>${correct}</strong></div>`;
   resEl.style.display = 'block';
@@ -782,68 +792,115 @@ function submitAnswer() {
   document.getElementById('quiz-answer').disabled = true;
   document.getElementById('btn-submit').style.display = 'none';
   document.getElementById('btn-next').style.display = 'block';
+
+  // 2. ☁️ 即座に個人のFirestoreデータベースに完全バックアップ送信！
+  if (!isGuest && auth.currentUser) {
+    db.collection('users').doc(auth.currentUser.uid).set({
+      currentRound: uCurrentRound,
+      roundAnswers: uRoundAnswers,
+      totalAnswers: uTotalAnswers,
+      totalCorrect: uTotalCorrect,
+      wordHistory: uWordHistory,
+      lastActive: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.error("データ即時保存エラー:", e));
+    
+    // 👑 ランキング用ドキュメントも同時にリアルタイム更新
+    const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
+    // ランキングソート用の累積進捗パーセント（1周クリア=100%, 2周目の50%=150%）
+    const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / rangeTotal) * 100);
+    const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
+
+    db.collection('leaderboard').doc(auth.currentUser.uid).set({
+      uid: auth.currentUser.uid,
+      displayName: nameToSave,
+      email: auth.currentUser.email,
+      progressPercent: accumulatedProgress,  // ソート用
+      currentRound: uCurrentRound,
+      roundProgress: Math.floor((uRoundAnswers.length / rangeTotal) * 100),
+      accuracy: totalAccuracy,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.error("ランキング同期エラー:", e));
+  }
 }
 
 function nextQuestion() {
   state.current++;
-  if (state.current >= state.queue.length) finishQuiz(false);
-  else renderQuestion();
-}
-
-function finishQuiz(isExit) {
-  document.getElementById('exit-modal').classList.remove('open');
-  if (state.results.length === 0) { showScreen('screen-home'); return; }
-  
-  state.sessions++;
-  const correctCount = state.results.filter(r => r.grade === 'correct').length;
-  const total = state.results.length;
-  state.learnedCount += correctCount;
-  
-  localStorage.setItem('tanGO_learned', state.learnedCount);
-  localStorage.setItem('tanGO_sessions', state.sessions);
-
-  if (!isGuest && auth.currentUser) {
-    db.collection('users').doc(auth.currentUser.uid).set({
-      learnedCount: state.learnedCount,
-      sessions: state.sessions,
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(e => console.error("個人成績の保存エラー:", e));
-
-    saveScoreToLeaderboard({
-      learned: state.learnedCount,
-      totalAnswers: state.learnedCount + 10,
-      accuracy: Math.round((correctCount / total) * 100)
-    });
+  if (state.current >= state.queue.length) {
+    // 全問題を解き終わった時
+    finishQuizSession();
+  } else {
+    renderQuestion();
   }
-
-  if (isExit) { showScreen('screen-home'); updateStats(); return; }
-
-  document.getElementById('result-sub').textContent = `${total}問中 ${correctCount}問正解！`;
-  showScreen('screen-result');
 }
 
-function updateStats() {
-  document.getElementById('stat-total').textContent = state.learnedCount;
-  document.getElementById('stat-sessions').textContent = state.sessions;
-  
+// 🌟 セッション終了処理
+function finishQuizSession() {
+  if (isRandomMode) {
+    // ランダムN問の場合は通常のリザルト画面へ
+    document.getElementById('result-title').textContent = "演習完了！";
+    const correctCount = state.results.filter(r => r.grade === 'correct').length;
+    document.getElementById('result-sub').textContent = `${state.results.length}問中 ${correctCount}問正解！`;
+    showScreen('screen-result');
+  } else {
+    // 周回モードの場合
+    const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
+    if (uRoundAnswers.length >= rangeTotal) {
+      // 🎉 本当に全問を解き切って【周回クリア】した瞬間！
+      document.getElementById('result-title').textContent = `${uCurrentRound}周目 100% 達成！！🎉`;
+      document.getElementById('result-sub').textContent = `テスト範囲の全${rangeTotal}語を一回ずつ解破しました！`;
+      
+      // 次の周回へカウントアップし、解いたリストをリセット！
+      uCurrentRound++;
+      uRoundAnswers = [];
+      
+      // クラウドに周回リセット状態を保存
+      if (!isGuest && auth.currentUser) {
+        db.collection('users').doc(auth.currentUser.uid).set({
+          currentRound: uCurrentRound,
+          roundAnswers: uRoundAnswers
+        }, { merge: true });
+      }
+      showScreen('screen-result');
+    } else {
+      // 途中の問題の固まりが終わっただけ（続きがある場合）
+      showScreen('screen-home');
+      refreshUI();
+    }
+  }
+}
+
+// ✕ ボタンでいつでも安全に中断して戻れる
+function exitQuizDirect() {
+  document.getElementById('exit-modal').classList.remove('open');
+  showScreen('screen-home');
+  refreshUI();
+}
+
+// 👑 リーダーボード表示（進捗％ ＋ 正解率％ の新仕様！）
+function updateLeaderboardDisplay() {
   const homeLeaderboard = document.getElementById('home-leaderboard');
   if (isGuest) {
     homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>";
-  } else {
-    homeLeaderboard.innerHTML = "<span style='color:#888;'>☁️ クラウドから取得中...</span>";
-    getGlobalLeaderboardFromCloud(3).then(board => {
-      if (!board || board.length === 0) {
-        homeLeaderboard.innerHTML = "まだデータがありません。一番乗りを目指しましょう！";
-      } else {
-        homeLeaderboard.innerHTML = board.map((e, i) => {
-          const m = e.email ? e.email.split('@')[0].slice(0,3)+'***' : '名無し';
-          return `<div style="padding:6px; background:${i===0?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px;">
-            ${i===0?'👑':i===1?'🥈':'🥉'} ${i+1}. ${e.displayName||m} — <strong style="color:#1976d2;">${e.learned}語</strong>
-          </div>`;
-        }).join('');
-      }
-    });
+    return;
   }
+  
+  db.collection('leaderboard').orderBy('progressPercent', 'desc').limit(3).get().then(snapshot => {
+    if (snapshot.empty) {
+      homeLeaderboard.innerHTML = "まだデータがありません。";
+      return;
+    }
+    let i = 0;
+    homeLeaderboard.innerHTML = snapshot.docs.map(doc => {
+      const e = doc.data();
+      const rankEmoji = i===0?'👑':i===1?'🥈':'🥉';
+      i++;
+      return `<div style="padding:6px; background:${i===1?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
+        <span>${rankEmoji} ${i}. <b>${e.displayName}</b></span>
+        <span><b style="color:#1976d2;">${e.currentRound}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
+      </div>`;
+    }).join('');
+  });
 }
 
 function openLeaderboardModal() {
@@ -851,132 +908,80 @@ function openLeaderboardModal() {
   const boardEl = document.getElementById('leaderboard-content-full');
   boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
   
-  getGlobalLeaderboardFromCloud(10).then(board => {
-    if(!board || !board.length) {
+  db.collection('leaderboard').orderBy('progressPercent', 'desc').limit(10).get().then(snapshot => {
+    if(snapshot.empty) {
       boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>";
-    } else {
-      boardEl.innerHTML = board.map((e, i) => {
-        const m = e.email ? e.email.split('@')[0].slice(0,3)+'***@' + e.email.split('@')[1] : '';
-        return `<div style="padding:10px; border-bottom:1px solid #eee;">
-          <div style="font-weight:bold;">${i+1}. ${e.displayName||'名無し'}</div>
-          <div style="font-size:11px; color:#888;">${m}</div>
-          <div style="font-size:13px; color:#333; margin-top:4px;">覚えた: <span style="color:#1976d2;font-weight:bold;">${e.learned}語</span></div>
-        </div>`;
-      }).join('');
+      return;
     }
+    let i = 0;
+    boardEl.innerHTML = snapshot.docs.map(doc => {
+      const e = doc.data();
+      i++;
+      return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:bold;">${i}. ${e.displayName}</div>
+          <div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound}周目 ${e.roundProgress || 0}%</div>
+        </div>
+      </div>`;
+    }).join('');
   });
 }
 
+// ニックネーム関連
 function openNicknameModal() {
   document.getElementById('nickname-input').value = currentNickname || (auth.currentUser ? auth.currentUser.displayName : "");
   document.getElementById('nickname-modal').classList.add('open');
 }
-
 async function saveNickname() {
   const newName = document.getElementById('nickname-input').value.trim();
   if (!newName) { alert("ニックネームを入力してください"); return; }
-  
   if (!isGuest && auth.currentUser) {
     try {
       await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true });
       currentNickname = newName;
       document.getElementById('user-info').textContent = `👤 ${newName}`;
-      await saveScoreToLeaderboard({ learned: state.learnedCount, totalAnswers: state.learnedCount + 10, accuracy: 100 });
       document.getElementById('nickname-modal').classList.remove('open');
-      updateStats(); 
+      // リーダーボード側の名前を書き換えるためのダミー更新
+      db.collection('leaderboard').doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true });
+      refreshUI();
     } catch(e) { alert("保存に失敗しました"); }
   }
 }
 
-// 📅 設定用ポップアップの処理
-let popupSelectedRange = "final";
-function setPopupRange(rangeType) {
-  popupSelectedRange = rangeType;
-  document.getElementById('pop-range-mid').classList.toggle('selected', rangeType === 'midterm');
-  document.getElementById('pop-range-fin').classList.toggle('selected', rangeType === 'final');
-}
-
-function openTestDateModal() {
-  document.getElementById('testdate-modal').classList.add('open');
-  setPopupRange(activeRange);
-  if (testDate) {
-    const y = testDate.getFullYear();
-    const m = String(testDate.getMonth() + 1).padStart(2, '0');
-    const d = String(testDate.getDate()).padStart(2, '0');
-    const h = String(testDate.getHours()).padStart(2, '0');
-    const min = String(testDate.getMinutes()).padStart(2, '0');
-    document.getElementById('testdate-date').value = `${y}-${m}-${d}`;
-    document.getElementById('testdate-time').value = `${h}:${min}`;
-  }
-}
-
-function setQuickTestDate(dateStr, timeStr, rangeType) {
-  document.getElementById('testdate-date').value = dateStr;
-  document.getElementById('testdate-time').value = timeStr;
-  setPopupRange(rangeType);
-}
-
-// 🌟 データを「vocabulary/active_test」という共通の場所に一発保存！
-async function saveTestDate() {
-  const dateVal = document.getElementById('testdate-date').value;
-  const timeVal = document.getElementById('testdate-time').value || '12:00';
-  if (!dateVal) { alert("日付を選択してください"); return; }
-  
-  const targetDate = new Date(`${dateVal}T${timeVal}:00`);
-  
+// 共通管理者用設定
+function openTestDateModal() { document.getElementById('testdate-modal').classList.add('open'); }
+async function setAndSaveSharedTest(testName, isoDateString, rangeType) {
+  const targetDate = new Date(isoDateString);
   if (!isGuest && auth.currentUser) {
     try {
-      // 全員共通のドキュメント「vocabulary/active_test」にテスト日と現在の試験範囲をまとめて保存
-      await db.collection('vocabulary').doc('active_test').set({
-        testDate: targetDate.toISOString(),
-        activeRange: popupSelectedRange
-      }, { merge: true });
-      
+      await db.collection('vocabulary').doc('active_test').set({ testDate: targetDate.toISOString(), activeRange: rangeType }, { merge: true });
       testDate = targetDate;
-      activeRange = popupSelectedRange;
-      console.log("✅ 共通テスト目標と範囲をクラウド全員と同期しました");
-    } catch(e) { console.error("共通データ保存エラー:", e); }
-  } else {
-    testDate = targetDate;
-    activeRange = popupSelectedRange;
-    localStorage.setItem('tanGO_testdate', testDate.toISOString());
+      activeRange = rangeType;
+      alert(`🎯 全員の目標を「${testName}」に強制変更・同期しました！ページをリロードします。`);
+      window.location.reload();
+    } catch(e) { console.error(e); }
   }
-
-  document.getElementById('testdate-modal').classList.remove('open');
-  startCountdown();
 }
 
-function startCountdown() {
-  if (countdownTimer) clearInterval(countdownTimer);
-  tickCountdown();
-  countdownTimer = setInterval(tickCountdown, 1000);
-}
-
-// 🌟 カウントダウンと、それに連動した「正確なテスト範囲別」ノルマ計算！
+// カウントダウン
+function startCountdown() { if (countdownTimer) clearInterval(countdownTimer); tickCountdown(); countdownTimer = setInterval(tickCountdown, 1000); }
 function tickCountdown() {
   const labelEl = document.getElementById('countdown-label');
   const daysEl = document.getElementById('countdown-days');
   const hmsEl = document.getElementById('countdown-hms');
   const normaEl = document.getElementById('norma-area');
-  
-  if (!testDate) {
-    labelEl.textContent = 'テスト日を設定してください';
-    daysEl.textContent = '--';
-    hmsEl.textContent = '--:--:--';
-    normaEl.innerHTML = '';
-    return;
-  }
+  if (!testDate) { return; }
 
   const now = new Date();
   const diff = testDate - now;
   const rangeName = (activeRange === 'midterm') ? "中間範囲" : "期末範囲";
 
   if (diff <= 0) {
-    labelEl.textContent = `${rangeName} テスト当日！`;
-    daysEl.textContent = '0';
-    hmsEl.textContent = '00:00:00';
-    normaEl.innerHTML = '<div class="norma-badge">🎯 頑張れ！本番開始！</div>';
-    return;
+    labelEl.textContent = `${rangeName} 当日！`; daysEl.textContent = '0'; hmsEl.textContent = '00:00:00';
+    normaEl.innerHTML = '<div class="norma-badge">🎯 本番開始！全力で行こう！</div>'; return;
   }
 
   const totalSec = Math.floor(diff / 1000);
@@ -984,21 +989,17 @@ function tickCountdown() {
   const hours = Math.floor((totalSec % 86400) / 3600);
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
-  
   const pad = n => String(n).padStart(2,'0');
   
-  labelEl.textContent = `${rangeName}まで（${testDate.getFullYear()}/${pad(testDate.getMonth() + 1)}/${pad(testDate.getDate())} ${pad(testDate.getHours())}:${pad(testDate.getMinutes())}）`;
+  labelEl.textContent = `${rangeName}テストまで（7/${testDate.getDate()} ${pad(testDate.getHours())}:${pad(testDate.getMinutes())}）`;
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 
-  // 🌟 ノルマ計算を現在の「同期中テスト範囲の単語数（141 or 142語）」基準に完全最適化！
+  // 🌟 ノルマ計算を「今回の周回で、まだ解いていない単語数」ベースに超精密化！
   const rangeTotal = (activeRange === 'midterm') ? 141 : 142; 
-  const learned = state.learnedCount;
-  
-  // 今回のターゲット範囲における、未完成の残単語数を概算
-  const remaining = Math.max(0, rangeTotal - (learned % rangeTotal)); 
+  const remaining = Math.max(0, rangeTotal - uRoundAnswers.length); 
   const norma = Math.ceil(remaining / (days + 1));
-  normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
+  normaEl.innerHTML = `<div class="norma-badge">📚 今日の残りノルマ: ${norma}語 / 日 (範囲内未回答: ${remaining}語)</div>`;
 }
 
 // tanGOエフェクト再生
@@ -1013,6 +1014,15 @@ function playTangoEffect(callback) {
     callback();
     setTimeout(() => { screen.classList.remove('active'); }, 300);
   }, 1000);
+}
+
+// 🔓 ログアウト・ゲストログイン
+function logout() { auth.signOut().then(() => window.location.reload()); }
+function loginAsGuest() {
+  isGuest = true; document.getElementById('user-info').textContent = "👤 ゲストユーザー";
+  document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
+  testDate = new Date("2026-07-03T09:10:00"); activeRange = "final";
+  startCountdown(); refreshUI();
 }
 </script>
 </body>
