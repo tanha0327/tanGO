@@ -11,7 +11,7 @@
 
 <script>
 // ==========================================
-// ⚠️⚠️⚠️ ご自身の firebaseConfig に書き換えてください ⚠️⚠️⚠️
+// Firebase設定（APIキー組み込み済み！）
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
@@ -28,11 +28,14 @@ if (!firebase.apps.length) {
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
-console.log("✅ Firebase 準備完了 (カウントダウンDB同期版)");
+console.log("✅ Firebase 準備完了 (完全同期版)");
 
+// グローバル変数（ここでしっかり定義します！）
 let isGuest = false;
 let testDate = null;
 let countdownTimer = null;
+let currentNickname = ""; // 🌟 エラーの原因だった変数を追加！
+let ALL_WORDS = [];
 
 // 🔐 ログイン（Live Server用ポップアップ）
 async function loginWithGoogle() {
@@ -57,7 +60,6 @@ function loginAsGuest() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-container').style.display = 'block';
   
-  // ゲスト用のローカル保存テスト日を読み込み
   const savedDate = localStorage.getItem('tanGO_testdate');
   if (savedDate) {
     testDate = new Date(savedDate);
@@ -68,21 +70,19 @@ function loginAsGuest() {
 }
 
 // 👑 ランキングへの保存
-// 👑 ランキングへの保存（ニックネーム対応版）
 async function saveScoreToLeaderboard(stats) {
   if (!auth.currentUser || isGuest) return;
   try {
-    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し'; // ニックネームを優先！
+    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
     await db.collection('leaderboard').doc(auth.currentUser.uid).set({
       uid: auth.currentUser.uid,
       displayName: nameToSave,
       email: auth.currentUser.email,
-      learned: stats.learned || state.learnedCount || 0,
+      learned: stats.learned || 0,
       totalAnswers: stats.totalAnswers || 0,
       accuracy: stats.accuracy || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    console.log("✅ ランキングデータをクラウドに送信しました");
   } catch (e) { console.error("保存エラー:", e); }
 }
 
@@ -104,7 +104,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .card { background: white; border: 1px solid #e5e5e0; border-radius: 12px; padding: 1rem; margin-bottom: 0.8rem; }
 .label { font-size: 12px; color: #888; margin-bottom: 6px; }
 .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.opt-btn { padding: 8px 6px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 12px; color: #555; text-align: center; width: 100%; }
+.opt-btn { padding: 8px 6px; border: 1px solid #e0e0da; background: white; border-radius: 8px; cursor: pointer; font-size: 12px; color: #555; text-align: center; width: 100%; transition: 0.2s; }
 .opt-btn.selected { border-color: #2D7DD2; background: #EBF4FF; color: #1a5ba0; font-weight: 600; }
 .big-btn { width: 100%; padding: 11px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
 .btn-primary { background: #2D7DD2; color: white; }
@@ -148,7 +148,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <div style="font-size: 24px; font-weight: 700; margin-bottom: 1rem;">単語復習アプリ</div>
-    <div style="font-size: 13px; color: #666; margin-bottom: 2rem;">クラウド同期対応版</div>
+    <div style="font-size: 13px; color: #666; margin-bottom: 2rem;">クラウド完全同期版</div>
     <button class="big-btn" style="background:white; border:2px solid #ddd; color:#333;" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
     <button class="big-btn btn-primary" onclick="loginAsGuest()">👤 ゲストで使用</button>
   </div>
@@ -225,8 +225,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="app">
     <div class="screen visible" id="screen-home">
-      <div style="display:flex;justify-content:space-between;margin-bottom:0.8rem;">
-        <span id="user-info" style="font-size:12px;color:#666;"></span>
+      <div style="display:flex;justify-content:space-between;margin-bottom:0.8rem;align-items:center;">
+        <div style="font-size:13px;color:#666;display:flex;align-items:center;gap:6px;">
+          <span id="user-info"></span>
+          <button id="btn-edit-nickname" style="display:none;background:none;border:1px solid #ccc;border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer;" onclick="openNicknameModal()">編集</button>
+        </div>
         <button class="exit-btn" onclick="logout()">🔓 ログアウト</button>
       </div>
       
@@ -243,8 +246,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
         <div class="label" style="margin-bottom:10px;">👑 クラウドトップ3 (タップで詳細)</div>
-        <div id="home-leaderboard" style="font-size:14px;color:#333;line-height:1.6;">
-          </div>
+        <div id="home-leaderboard" style="font-size:14px;color:#333;line-height:1.6;"></div>
       </div>
       
       <div class="stat-grid">
@@ -265,7 +267,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
 
-    <!-- ══ SETUP ═════════════════════════════════════════ -->
     <div class="screen" id="screen-setup">
       <div class="card">
         <div class="label">🎯 試験範囲の選択</div>
@@ -279,8 +280,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="slider-wrap" style="margin-bottom:10px;"><input type="range" id="range-from" min="0" max="282" value="0" oninput="updateRangeSliders()"></div>
         <div class="slider-wrap"><input type="range" id="range-to" min="0" max="282" value="282" oninput="updateRangeSliders()"></div>
       </div>
-
-      <!-- 👇追加：出題順のカード👇 -->
+      
       <div class="card">
         <div class="label">出題順</div>
         <div class="option-grid">
@@ -288,7 +288,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <button class="opt-btn" id="order-rand" onclick="setOrder('random')">ランダム</button>
         </div>
       </div>
-      <!-- 👆ここまで追加👆 -->
 
       <button class="big-btn btn-primary" onclick="startStudy()">▶ 学習開始</button>
       <button class="big-btn btn-secondary" onclick="showScreen('screen-home')">← 戻る</button>
@@ -324,7 +323,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
-// --- 単語データ ---
+// --- 生の単語データ (データベース初回構築用) ---
 const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1402	boil	をわかす，ふっとうする，を煮る，煮える
 1403	melt	を溶かす，溶ける
@@ -609,21 +608,41 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1682	combination	組み合わせ，結合
 1683	evidence	証拠`;
 
-const ALL_WORDS = RAW.trim().split('\n').map(line => {
-  const p = line.split('\t');
-  return { id: parseInt(p[0], 10), en: p[1].trim(), jp: p[2].trim() };
-});
-
 const state = {
   queue: [], current: 0, results: [],
   learnedCount: parseInt(localStorage.getItem('tanGO_learned')||'0'),
   sessions: parseInt(localStorage.getItem('tanGO_sessions')||'0'),
-  order: 'asc' // ← この1行を追加！
+  order: 'asc'
 };
 
-// 🚀 画面ロード時の処理（認証状態を監視しつつテスト日をロード）
-// 🚀 画面ロード時の処理（成績とテスト日をクラウドから完全同期）
-// 🚀 画面ロード時の処理（ニックネーム同期追加版）
+// ☁️ データベース（Firestore）から単語を取得＆自動登録する処理
+async function initDictionary() {
+  try {
+    const midDoc = await db.collection('vocabulary').doc('midterm').get();
+    const finDoc = await db.collection('vocabulary').doc('final').get();
+
+    if (midDoc.exists && finDoc.exists) {
+      ALL_WORDS = [...midDoc.data().words, ...finDoc.data().words];
+      console.log("☁️ Firestoreから単語データを読み込みました！");
+    } else {
+      console.log("⏳ データベース作成中...");
+      ALL_WORDS = RAW.trim().split('\n').map(line => {
+        const p = line.split('\t');
+        return { id: parseInt(p[0], 10), en: p[1].trim(), jp: p[2].trim() };
+      });
+      await db.collection('vocabulary').doc('midterm').set({ title: "中間 (1401〜1541)", words: ALL_WORDS.slice(0, 141) });
+      await db.collection('vocabulary').doc('final').set({ title: "期末 (1542〜1683)", words: ALL_WORDS.slice(141) });
+    }
+
+    document.getElementById('range-from').max = ALL_WORDS.length - 1;
+    document.getElementById('range-to').max = ALL_WORDS.length - 1;
+    updateRangeSliders();
+  } catch(e) {
+    console.error("単語DB初期化エラー:", e);
+  }
+}
+
+// 🚀 画面ロード時の処理（すべてをここで連携！）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
@@ -637,10 +656,7 @@ window.onload = () => {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           const data = userDoc.data();
-          
-          // ニックネームの同期
           if (data.nickname) currentNickname = data.nickname;
-          
           if (data.testDate) testDate = new Date(data.testDate);
           else {
             const savedLocal = localStorage.getItem('tanGO_testdate');
@@ -661,7 +677,7 @@ window.onload = () => {
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `👤 ${currentNickname || user.displayName || user.email}`;
       if (!isGuest) {
-        document.getElementById('btn-edit-nickname').style.display = 'block'; // 編集ボタンを表示
+        document.getElementById('btn-edit-nickname').style.display = 'block';
       }
 
       await initDictionary();
@@ -679,6 +695,7 @@ function showScreen(id) {
   document.getElementById(id).classList.add('visible');
 }
 
+// 🎯 試験範囲の選択
 function setTestRange(type) {
   if (type === 'midterm') { document.getElementById('range-from').value = 0; document.getElementById('range-to').value = 140; }
   if (type === 'final') { document.getElementById('range-from').value = 141; document.getElementById('range-to').value = 282; }
@@ -688,11 +705,11 @@ function setTestRange(type) {
 function updateRangeSliders() {
   const fi=parseInt(document.getElementById('range-from').value), ti=parseInt(document.getElementById('range-to').value);
   const lo=Math.min(fi,ti), hi=Math.max(fi,ti);
-  document.getElementById('range-from-lbl').textContent = ALL_WORDS[lo].id;
-  document.getElementById('range-to-lbl').textContent = ALL_WORDS[hi].id;
+  if(ALL_WORDS.length > 0) {
+    document.getElementById('range-from-lbl').textContent = ALL_WORDS[lo].id;
+    document.getElementById('range-to-lbl').textContent = ALL_WORDS[hi].id;
+  }
 }
-
-// ↓↓↓ 既存の updateRangeSliders() の下あたりに追加＆上書き ↓↓↓
 
 // 🔘 出題順を切り替える関数
 function setOrder(orderType) {
@@ -701,16 +718,14 @@ function setOrder(orderType) {
   document.getElementById('order-rand').classList.toggle('selected', orderType === 'random');
 }
 
-// 🚀 学習開始関数（これ1つだけにします！）
+// 🚀 学習開始関数
 function startStudy() {
   const fi = parseInt(document.getElementById('range-from').value);
   const ti = parseInt(document.getElementById('range-to').value);
   const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
   
-  // まずは順番通り（昇順）に単語リストを作る
   let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
   
-  // 「ランダム」ボタンが選ばれていた時だけシャッフルする
   if (state.order === 'random') {
     queueList = queueList.sort(() => Math.random() - 0.5);
   }
@@ -782,20 +797,16 @@ function finishQuiz(isExit) {
   const total = state.results.length;
   state.learnedCount += correctCount;
   
-  // ローカルに保存
   localStorage.setItem('tanGO_learned', state.learnedCount);
   localStorage.setItem('tanGO_sessions', state.sessions);
 
-  // ☁️ クラウドに完全保存（ゲスト以外）
   if (!isGuest && auth.currentUser) {
-    // 1. 個人の成績データベースに保存（追加！）
     db.collection('users').doc(auth.currentUser.uid).set({
       learnedCount: state.learnedCount,
       sessions: state.sessions,
       lastLogin: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).catch(e => console.error("個人成績の保存エラー:", e));
 
-    // 2. ランキングデータベースに保存
     saveScoreToLeaderboard({
       learned: state.learnedCount,
       totalAnswers: state.learnedCount + 10,
@@ -856,7 +867,43 @@ function openLeaderboardModal() {
   });
 }
 
-// 📅 カウントダウン関連の関数
+// ✏️ ニックネームモーダルを開く
+function openNicknameModal() {
+  document.getElementById('nickname-input').value = currentNickname || (auth.currentUser ? auth.currentUser.displayName : "");
+  document.getElementById('nickname-modal').classList.add('open');
+}
+
+// ✏️ ニックネームを保存
+async function saveNickname() {
+  const newName = document.getElementById('nickname-input').value.trim();
+  if (!newName) { alert("ニックネームを入力してください"); return; }
+  
+  if (!isGuest && auth.currentUser) {
+    try {
+      await db.collection('users').doc(auth.currentUser.uid).set({
+        nickname: newName
+      }, { merge: true });
+      
+      currentNickname = newName;
+      document.getElementById('user-info').textContent = `👤 ${newName}`;
+      
+      await saveScoreToLeaderboard({
+        learned: state.learnedCount,
+        totalAnswers: state.learnedCount + 10,
+        accuracy: 100 // 仮置き
+      });
+      
+      console.log("✅ ニックネームを保存・同期しました");
+      document.getElementById('nickname-modal').classList.remove('open');
+      updateStats(); 
+    } catch(e) {
+      console.error("ニックネーム保存エラー:", e);
+      alert("保存に失敗しました");
+    }
+  }
+}
+
+// 📅 カウントダウン関連
 function openTestDateModal() {
   document.getElementById('testdate-modal').classList.add('open');
   if (testDate) {
@@ -882,16 +929,12 @@ async function saveTestDate() {
   
   testDate = new Date(`${dateVal}T${timeVal}:00`);
   
-  // クラウドに保存（ゲスト以外）
   if (!isGuest && auth.currentUser) {
     try {
-      await db.collection('users').doc(auth.currentUser.uid).set({
-        testDate: testDate.toISOString()
-      }, { merge: true });
+      await db.collection('users').doc(auth.currentUser.uid).set({ testDate: testDate.toISOString() }, { merge: true });
       console.log("✅ テスト日をクラウドに保存しました");
     } catch(e) { console.error("テスト日保存エラー:", e); }
   } else {
-    // ゲスト用フォールバック
     localStorage.setItem('tanGO_testdate', testDate.toISOString());
   }
 
@@ -901,7 +944,7 @@ async function saveTestDate() {
 
 function startCountdown() {
   if (countdownTimer) clearInterval(countdownTimer);
-  tickCountdown(); // すぐに1回更新
+  tickCountdown();
   countdownTimer = setInterval(tickCountdown, 1000);
 }
 
@@ -947,52 +990,11 @@ function tickCountdown() {
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 
-  // ノルマ計算（未学習の単語数 ÷ 残り日数）
-  const TOTAL = ALL_WORDS.length;
+  const TOTAL = ALL_WORDS.length > 0 ? ALL_WORDS.length : 283;
   const learned = state.learnedCount;
   const remaining = Math.max(0, TOTAL - learned);
   const norma = Math.ceil(remaining / (days + 1));
   normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
-}
-
-// ✏️ ニックネームモーダルを開く
-function openNicknameModal() {
-  document.getElementById('nickname-input').value = currentNickname || (auth.currentUser ? auth.currentUser.displayName : "");
-  document.getElementById('nickname-modal').classList.add('open');
-}
-
-// ✏️ ニックネームをクラウドに保存する
-async function saveNickname() {
-  const newName = document.getElementById('nickname-input').value.trim();
-  if (!newName) { alert("ニックネームを入力してください"); return; }
-  
-  if (!isGuest && auth.currentUser) {
-    try {
-      // 1. 個人のデータベース(users)に保存
-      await db.collection('users').doc(auth.currentUser.uid).set({
-        nickname: newName
-      }, { merge: true });
-      
-      currentNickname = newName;
-      document.getElementById('user-info').textContent = `👤 ${newName}`;
-      
-      // 2. ランキングデータベースも更新（名前だけ上書きするために送信）
-      await saveScoreToLeaderboard({
-        learned: state.learnedCount,
-        totalAnswers: state.learnedCount + 10,
-        accuracy: 100 // ※ここは一時的な仮数字
-      });
-      
-      console.log("✅ ニックネームを保存・同期しました");
-      document.getElementById('nickname-modal').classList.remove('open');
-      
-      // ホームのランキング表示を最新にする
-      updateStats(); 
-    } catch(e) {
-      console.error("ニックネーム保存エラー:", e);
-      alert("保存に失敗しました");
-    }
-  }
 }
 </script>
 </body>
