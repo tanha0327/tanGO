@@ -208,7 +208,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <!-- JSで中身を再生成してアニメーションをリセットします -->
     </div>
   </div>
-  
+
   <div class="modal-overlay" id="nickname-modal">
     <div class="modal-box">
       <div class="modal-title">✏️ ニックネームの変更</div>
@@ -773,31 +773,63 @@ function setOrder(orderType) {
 }
 
 // 🚀 学習開始関数
+// 🌟 tanGO エフェクトを再生してからクイズ画面へ行く関数
+function playTangoEffect(callback) {
+  const screen = document.getElementById('transition-screen');
+  const logo = document.getElementById('tango-logo');
+  
+  // アニメーションをリセットして表示
+  screen.classList.remove('transition-fade-out');
+  screen.classList.add('active');
+  
+  // 要素を再生成してCSSアニメーションを毎回最初から再生させる
+  logo.innerHTML = '<span class="tango-tan">tan</span><span class="tango-go">GO!!</span>';
+
+  // 1秒後にフェードアウトを開始し、その裏でクイズ画面を準備
+  setTimeout(() => {
+    screen.classList.add('transition-fade-out');
+    callback(); // 画面がフェードアウトする直前にクイズを描画！
+    
+    // アニメーションが完全に消えたら非表示にする
+    setTimeout(() => {
+      screen.classList.remove('active');
+    }, 300);
+  }, 1000);
+}
+
+// 🚀 学習開始関数（エフェクト付き）
 function startStudy() {
   const fi = parseInt(document.getElementById('range-from').value);
   const ti = parseInt(document.getElementById('range-to').value);
   const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
   
   let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
-  
-  if (state.order === 'random') {
-    queueList = queueList.sort(() => Math.random() - 0.5);
-  }
+  if (state.order === 'random') queueList = queueList.sort(() => Math.random() - 0.5);
   
   state.queue = queueList;
   state.current = 0; 
   state.results = [];
   
-  showScreen('screen-quiz'); 
-  renderQuestion();
+  // そのまま画面遷移せず、エフェクトを挟む！
+  playTangoEffect(() => {
+    showScreen('screen-quiz'); 
+    renderQuestion();
+  });
 }
 
+// 🎲 ランダムN問開始関数（エフェクト付き）
 function startRandomN() {
   const n = parseInt(document.getElementById('random-n-slider').value);
   state.queue = ALL_WORDS.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
   state.current = 0; state.results = [];
+  
   document.getElementById('random-modal').classList.remove('open');
-  showScreen('screen-quiz'); renderQuestion();
+  
+  // こちらもエフェクトを挟む！
+  playTangoEffect(() => {
+    showScreen('screen-quiz'); 
+    renderQuestion();
+  });
 }
 
 function renderQuestion() {
