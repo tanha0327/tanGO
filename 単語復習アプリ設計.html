@@ -68,18 +68,21 @@ function loginAsGuest() {
 }
 
 // 👑 ランキングへの保存
+// 👑 ランキングへの保存（ニックネーム対応版）
 async function saveScoreToLeaderboard(stats) {
   if (!auth.currentUser || isGuest) return;
   try {
+    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し'; // ニックネームを優先！
     await db.collection('leaderboard').doc(auth.currentUser.uid).set({
       uid: auth.currentUser.uid,
-      displayName: auth.currentUser.displayName || '名無し',
+      displayName: nameToSave,
       email: auth.currentUser.email,
-      learned: stats.learned || 0,
+      learned: stats.learned || state.learnedCount || 0,
       totalAnswers: stats.totalAnswers || 0,
       accuracy: stats.accuracy || 0,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    console.log("✅ ランキングデータをクラウドに送信しました");
   } catch (e) { console.error("保存エラー:", e); }
 }
 
@@ -167,7 +170,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
   </div>
-  
+
   <div class="modal-overlay" id="exit-modal">
     <div class="modal-box">
       <div class="modal-title">途中退出しますか？</div>
@@ -620,6 +623,7 @@ const state = {
 
 // 🚀 画面ロード時の処理（認証状態を監視しつつテスト日をロード）
 // 🚀 画面ロード時の処理（成績とテスト日をクラウドから完全同期）
+// 🚀 画面ロード時の処理（ニックネーム同期追加版）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
@@ -627,24 +631,21 @@ window.onload = () => {
     if (user) {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
-      const userInfo = document.getElementById('user-info');
-      if (userInfo) userInfo.textContent = `👤 ${user.displayName || user.email}`;
       
-      // ☁️ Firestoreからユーザーの【テスト日】と【成績】を読み込む
+      // ☁️ Firestoreからユーザーデータを読み込む
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           const data = userDoc.data();
           
-          // テスト日の同期
-          if (data.testDate) {
-            testDate = new Date(data.testDate);
-          } else {
+          // ニックネームの同期
+          if (data.nickname) currentNickname = data.nickname;
+          
+          if (data.testDate) testDate = new Date(data.testDate);
+          else {
             const savedLocal = localStorage.getItem('tanGO_testdate');
             if (savedLocal) testDate = new Date(savedLocal);
           }
-
-          // 成績の同期（クラウドのデータが多ければローカルを上書きする）
           if (data.learnedCount !== undefined) {
             state.learnedCount = Math.max(state.learnedCount, data.learnedCount);
             localStorage.setItem('tanGO_learned', state.learnedCount);
@@ -656,6 +657,14 @@ window.onload = () => {
         }
       } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
 
+      // ユーザー名の表示（ニックネーム優先）
+      const userInfo = document.getElementById('user-info');
+      if (userInfo) userInfo.textContent = `👤 ${currentNickname || user.displayName || user.email}`;
+      if (!isGuest) {
+        document.getElementById('btn-edit-nickname').style.display = 'block'; // 編集ボタンを表示
+      }
+
+      await initDictionary();
       startCountdown();
       updateStats();
     } else if (!isGuest) {
@@ -944,6 +953,46 @@ function tickCountdown() {
   const remaining = Math.max(0, TOTAL - learned);
   const norma = Math.ceil(remaining / (days + 1));
   normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
+}
+
+// ✏️ ニックネームモーダルを開く
+function openNicknameModal() {
+  document.getElementById('nickname-input').value = currentNickname || (auth.currentUser ? auth.currentUser.displayName : "");
+  document.getElementById('nickname-modal').classList.add('open');
+}
+
+// ✏️ ニックネームをクラウドに保存する
+async function saveNickname() {
+  const newName = document.getElementById('nickname-input').value.trim();
+  if (!newName) { alert("ニックネームを入力してください"); return; }
+  
+  if (!isGuest && auth.currentUser) {
+    try {
+      // 1. 個人のデータベース(users)に保存
+      await db.collection('users').doc(auth.currentUser.uid).set({
+        nickname: newName
+      }, { merge: true });
+      
+      currentNickname = newName;
+      document.getElementById('user-info').textContent = `👤 ${newName}`;
+      
+      // 2. ランキングデータベースも更新（名前だけ上書きするために送信）
+      await saveScoreToLeaderboard({
+        learned: state.learnedCount,
+        totalAnswers: state.learnedCount + 10,
+        accuracy: 100 // ※ここは一時的な仮数字
+      });
+      
+      console.log("✅ ニックネームを保存・同期しました");
+      document.getElementById('nickname-modal').classList.remove('open');
+      
+      // ホームのランキング表示を最新にする
+      updateStats(); 
+    } catch(e) {
+      console.error("ニックネーム保存エラー:", e);
+      alert("保存に失敗しました");
+    }
+  }
 }
 </script>
 </body>
