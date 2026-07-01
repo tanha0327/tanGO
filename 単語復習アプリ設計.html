@@ -11,7 +11,7 @@
 
 <script>
 // ==========================================
-// Firebase設定（APIキー組み込み済み！）
+// Firebase設定
 // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyBjuoIbzbxe4jZVw7tUXcXECnP3824vREo",
@@ -28,71 +28,15 @@ if (!firebase.apps.length) {
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
-console.log("✅ Firebase 準備完了 (完全同期版)");
+console.log("✅ Firebase 準備完了 (共通テスト同期版)");
 
-// グローバル変数（ここでしっかり定義します！）
+// グローバル変数
 let isGuest = false;
 let testDate = null;
 let countdownTimer = null;
-let currentNickname = ""; // 🌟 エラーの原因だった変数を追加！
+let currentNickname = "";
 let ALL_WORDS = [];
-
-// 🔐 ログイン（Live Server用ポップアップ）
-async function loginWithGoogle() {
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
-    window.location.reload();
-  } catch (error) {
-    console.error("❌ ログインエラー:", error);
-    alert("ログインに失敗しました。詳細: " + error.message);
-  }
-}
-
-async function logout() {
-  await auth.signOut();
-  window.location.reload();
-}
-
-function loginAsGuest() {
-  isGuest = true;
-  document.getElementById('user-info').textContent = "👤 ゲストユーザー";
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-container').style.display = 'block';
-  
-  const savedDate = localStorage.getItem('tanGO_testdate');
-  if (savedDate) {
-    testDate = new Date(savedDate);
-    startCountdown();
-  }
-  showScreen('screen-home');
-  updateStats();
-}
-
-// 👑 ランキングへの保存
-async function saveScoreToLeaderboard(stats) {
-  if (!auth.currentUser || isGuest) return;
-  try {
-    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
-    await db.collection('leaderboard').doc(auth.currentUser.uid).set({
-      uid: auth.currentUser.uid,
-      displayName: nameToSave,
-      email: auth.currentUser.email,
-      learned: stats.learned || 0,
-      totalAnswers: stats.totalAnswers || 0,
-      accuracy: stats.accuracy || 0,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  } catch (e) { console.error("保存エラー:", e); }
-}
-
-// 👑 ランキングの取得
-async function getGlobalLeaderboardFromCloud(limitCount = 3) {
-  try {
-    const snapshot = await db.collection('leaderboard').orderBy('learned', 'desc').limit(limitCount).get();
-    return snapshot.docs.map(doc => doc.data());
-  } catch (e) { return []; }
-}
+let activeRange = "final"; // 🌟 共通の試験範囲（'midterm' または 'final'）
 </script>
 
 <style>
@@ -134,7 +78,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
 .login-box { background: white; border-radius: 16px; padding: 2rem; max-width: 400px; width: 90%; text-align: center; }
 
-/* カウントダウン用デザイン */
 .countdown-card { background:linear-gradient(135deg,#1a237e,#1565c0,#0d47a1); border-radius:14px; padding:1rem; margin-bottom:0.8rem; color:white; text-align:center; box-shadow: 0 4px 12px rgba(13,71,161,0.2); }
 .countdown-days { font-size:48px; font-weight:800; line-height:1; }
 .countdown-hms { font-size:18px; font-weight:600; letter-spacing:1px; margin-top:4px; opacity:0.9; }
@@ -142,52 +85,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .test-date-btn:hover { background:rgba(255,255,255,0.25); }
 .norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600; margin-top:8px; }
 
-/* 🌟 tanGOエフェクト用デザイン */
-.transition-screen {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(135deg, #1a237e 0%, #091a45 100%);
-  z-index: 999;
-  align-items: center;
-  justify-content: center;
-}
+/* tanGOエフェクト用デザイン */
+.transition-screen { display: none; position: fixed; inset: 0; background: linear-gradient(135deg, #1a237e 0%, #091a45 100%); z-index: 999; align-items: center; justify-content: center; }
 .transition-screen.active { display: flex; }
-.tango-logo {
-  display: flex;
-  align-items: baseline;
-  font-family: 'Arial Black', Impact, sans-serif;
-  letter-spacing: -2px;
-}
-.tango-tan {
-  font-size: 56px;
-  color: white;
-  opacity: 0;
-  animation: slideFadeIn 0.3s ease forwards;
-}
-.tango-go {
-  font-size: 88px;
-  color: #FFB300;
-  font-style: italic;
-  opacity: 0;
-  transform: scale(3) rotate(-15deg);
-  animation: slamIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.25s forwards;
-  text-shadow: 0 8px 16px rgba(0,0,0,0.4);
-}
-@keyframes slideFadeIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@keyframes slamIn {
-  from { opacity: 0; transform: scale(3) rotate(-15deg); }
-  to { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-.transition-fade-out {
-  animation: fadeOutBg 0.3s ease forwards;
-}
-@keyframes fadeOutBg {
-  to { opacity: 0; visibility: hidden; }
-}
+.tango-logo { display: flex; align-items: baseline; font-family: 'Arial Black', Impact, sans-serif; letter-spacing: -2px; }
+.tango-tan { font-size: 56px; color: white; opacity: 0; animation: slideFadeIn 0.3s ease forwards; }
+.tango-go { font-size: 88px; color: #FFB300; font-style: italic; opacity: 0; transform: scale(3) rotate(-15deg); animation: slamIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.25s forwards; text-shadow: 0 8px 16px rgba(0,0,0,0.4); }
+@keyframes slideFadeIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slamIn { from { opacity: 0; transform: scale(3) rotate(-15deg); } to { opacity: 1; transform: scale(1) rotate(0deg); } }
+.transition-fade-out { animation: fadeOutBg 0.3s ease forwards; }
+@keyframes fadeOutBg { to { opacity: 0; visibility: hidden; } }
 </style>
 </head>
 <body>
@@ -202,11 +109,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <div id="app-container" style="display: none;">
-  <!-- 🌟 tanGO エフェクト画面 -->
   <div class="transition-screen" id="transition-screen">
-    <div class="tango-logo" id="tango-logo">
-      <!-- JSで中身を再生成してアニメーションをリセットします -->
-    </div>
+    <div class="tango-logo" id="tango-logo"></div>
   </div>
 
   <div class="modal-overlay" id="nickname-modal">
@@ -249,20 +153,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="modal-overlay" id="testdate-modal">
     <div class="modal-box">
-      <div class="modal-title">📅 テスト日を設定</div>
+      <div class="modal-title">📅 共通テスト・範囲の設定</div>
+      <div style="font-size:11px; color:#666; text-align:center; margin-bottom:12px;">ここで設定した内容は、アプリを使う全員に同期されます。</div>
       <div class="card" style="margin-bottom:1rem; padding:0.75rem;">
         <div class="label">🎯 クイック選択</div>
         <div class="option-grid">
-          <button class="opt-btn" onclick="setQuickTestDate('2026-07-03', '09:10')">一学期期末 (7/3 9:10)</button>
+          <button class="opt-btn" onclick="setQuickTestDate('2026-07-03', '09:10', 'final')">一学期期末 (7/3 9:10 - 期末)</button>
         </div>
       </div>
       <div style="margin-bottom:1rem;">
+        <div class="label">📅 試験日</div>
         <input type="date" id="testdate-date" class="text-input">
         <input type="time" id="testdate-time" class="text-input">
+        
+        <div class="label" style="margin-top:8px;">🎯 対象範囲</div>
+        <div class="option-grid">
+          <button class="opt-btn selected" id="pop-range-mid" onclick="setPopupRange('midterm')">中間 (1401〜1541)</button>
+          <button class="opt-btn" id="pop-range-fin" onclick="setPopupRange('final')">期末 (1542〜1683)</button>
+        </div>
       </div>
       <div class="modal-btns">
         <button class="big-btn btn-secondary" onclick="document.getElementById('testdate-modal').classList.remove('open')">戻る</button>
-        <button class="big-btn btn-primary" onclick="saveTestDate()">クラウドに保存</button>
+        <button class="big-btn btn-primary" onclick="saveTestDate()">全員と同期保存</button>
       </div>
     </div>
   </div>
@@ -295,7 +207,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
         <div class="countdown-hms" id="countdown-hms">--:--:--</div>
         <div id="norma-area"></div>
-        <button class="test-date-btn" onclick="openTestDateModal()">📅 目標日時を設定する</button>
+        <button class="test-date-btn" onclick="openTestDateModal()">📅 目標・範囲を設定する</button>
       </div>
       
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
@@ -316,9 +228,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;">
-        <button class="big-btn btn-primary" onclick="showScreen('screen-setup')">✏️ 通常モード</button>
-        <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.add('open')">🎲 ランダムN問</button>
+        <button class="big-btn btn-primary" onclick="startStudyDirect()">✏️ 通常演習をスタート</button>
+        <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.add('open')">🎲 テスト範囲からランダムN問</button>
       </div>
+      <div style="text-align:center;"><button class="exit-btn" style="width:100%; padding:8px;" onclick="showScreen('screen-setup')">⚙️ 細かく手動で範囲調整する</button></div>
     </div>
 
     <div class="screen" id="screen-setup">
@@ -377,7 +290,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
-// --- 生の単語データ (データベース初回構築用) ---
+// 単語データ
 const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1402	boil	をわかす，ふっとうする，を煮る，煮える
 1403	melt	を溶かす，溶ける
@@ -448,7 +361,7 @@ const RAW = `1401	bake	(パンなど)を焼く，焼ける
 1468	election	選挙
 1469	official	公の，公式の／公務員，役人，職員
 1470	moral	道徳の，道徳的な／《(複)で》道徳
-1471	investigation	調査，捜査
+1471	investigation	調査，捜捜
 1472	data	資料，データ，情報
 1473	aspect	面，様相
 1474	factor	要因，要素
@@ -669,7 +582,7 @@ const state = {
   order: 'asc'
 };
 
-// ☁️ データベース（Firestore）から単語を取得＆自動登録する処理
+// ☁️ データベース（Firestore）から単語を取得
 async function initDictionary() {
   try {
     const midDoc = await db.collection('vocabulary').doc('midterm').get();
@@ -691,12 +604,10 @@ async function initDictionary() {
     document.getElementById('range-from').max = ALL_WORDS.length - 1;
     document.getElementById('range-to').max = ALL_WORDS.length - 1;
     updateRangeSliders();
-  } catch(e) {
-    console.error("単語DB初期化エラー:", e);
-  }
+  } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
-// 🚀 画面ロード時の処理（すべてをここで連携！）
+// 🚀 画面ロード時の処理（テスト日と範囲を共通ドキュメントから同期！）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
   
@@ -705,17 +616,25 @@ window.onload = () => {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app-container').style.display = 'block';
       
-      // ☁️ Firestoreからユーザーデータを読み込む
+      // 1. まず単語DBを構築
+      await initDictionary();
+      
+      // 2. 🌟 共通の『テスト目標・範囲』をクラウドの同一の場所から取得！
+      try {
+        const targetDoc = await db.collection('vocabulary').doc('active_test').get();
+        if (targetDoc.exists) {
+          const config = targetDoc.data();
+          if (config.testDate) testDate = new Date(config.testDate);
+          if (config.activeRange) activeRange = config.activeRange;
+        }
+      } catch(e) { console.error("共通テスト目標の取得に失敗:", e); }
+      
+      // 3. 個人の成績を読み込む
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           const data = userDoc.data();
           if (data.nickname) currentNickname = data.nickname;
-          if (data.testDate) testDate = new Date(data.testDate);
-          else {
-            const savedLocal = localStorage.getItem('tanGO_testdate');
-            if (savedLocal) testDate = new Date(savedLocal);
-          }
           if (data.learnedCount !== undefined) {
             state.learnedCount = Math.max(state.learnedCount, data.learnedCount);
             localStorage.setItem('tanGO_learned', state.learnedCount);
@@ -727,14 +646,10 @@ window.onload = () => {
         }
       } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
 
-      // ユーザー名の表示（ニックネーム優先）
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `👤 ${currentNickname || user.displayName || user.email}`;
-      if (!isGuest) {
-        document.getElementById('btn-edit-nickname').style.display = 'block';
-      }
+      if (!isGuest) document.getElementById('btn-edit-nickname').style.display = 'block';
 
-      await initDictionary();
       startCountdown();
       updateStats();
     } else if (!isGuest) {
@@ -749,7 +664,7 @@ function showScreen(id) {
   document.getElementById(id).classList.add('visible');
 }
 
-// 🎯 試験範囲の選択
+// 手動調整用
 function setTestRange(type) {
   if (type === 'midterm') { document.getElementById('range-from').value = 0; document.getElementById('range-to').value = 140; }
   if (type === 'final') { document.getElementById('range-from').value = 141; document.getElementById('range-to').value = 282; }
@@ -765,47 +680,35 @@ function updateRangeSliders() {
   }
 }
 
-// 🔘 出題順を切り替える関数
 function setOrder(orderType) {
   state.order = orderType;
   document.getElementById('order-asc').classList.toggle('selected', orderType === 'asc');
   document.getElementById('order-rand').classList.toggle('selected', orderType === 'random');
 }
 
-// 🚀 学習開始関数
-// 🌟 tanGO エフェクトを再生してからクイズ画面へ行く関数
-function playTangoEffect(callback) {
-  const screen = document.getElementById('transition-screen');
-  const logo = document.getElementById('tango-logo');
+// 🌟 ホーム画面から「通常演習をスタート」を押したときの、爆速自動セット関数！
+function startStudyDirect() {
+  if (!ALL_WORDS || ALL_WORDS.length === 0) return;
+  // クラウドと同期している範囲（中間か期末）に合わせて自動でインデックスを切り替え
+  const lo = (activeRange === 'midterm') ? 0 : 141;
+  const hi = (activeRange === 'midterm') ? 140 : 282;
   
-  // アニメーションをリセットして表示
-  screen.classList.remove('transition-fade-out');
-  screen.classList.add('active');
+  let queueList = ALL_WORDS.slice(lo, hi + 1).map(w => ({ word: w, dir: 'jp-en' }));
+  if (state.order === 'random') queueList = queueList.sort(() => Math.random() - 0.5);
   
-  // 要素を再生成してCSSアニメーションを毎回最初から再生させる
-  logo.innerHTML = '<span class="tango-tan">tan</span><span class="tango-go">GO!!</span>';
-
-  // 1秒後にフェードアウトを開始し、その裏でクイズ画面を準備
-  setTimeout(() => {
-    screen.classList.add('transition-fade-out');
-    callback(); // 画面がフェードアウトする直前にクイズを描画！
-    
-    // アニメーションが完全に消えたら非表示にする
-    setTimeout(() => {
-      screen.classList.remove('active');
-    }, 300);
-  }, 1000);
+  state.queue = queueList;
+  state.current = 0;
+  state.results = [];
+  
+  playTangoEffect(() => {
+    showScreen('screen-quiz');
+    renderQuestion();
+  });
 }
 
-// 🚀 学習開始関数（エフェクト付き）
-// 🚀 学習開始関数（エフェクト＆安全対策付き）
+// 手動画面からの学習開始
 function startStudy() {
-  // 🚨 安全対策：単語が読み込めていない時はストップ！
-  if (!ALL_WORDS || ALL_WORDS.length === 0) {
-    alert("⚠️ 単語データを読み込み中です。APIキーが正しいか確認し、数秒待ってからもう一度押してください。");
-    return;
-  }
-
+  if (!ALL_WORDS || ALL_WORDS.length === 0) return;
   const fi = parseInt(document.getElementById('range-from').value);
   const ti = parseInt(document.getElementById('range-to').value);
   const lo = Math.min(fi, ti), hi = Math.max(fi, ti);
@@ -823,16 +726,17 @@ function startStudy() {
   });
 }
 
-// 🎲 ランダムN問開始関数（エフェクト＆安全対策付き）
+// 🌟 クラウドに同期されたテスト範囲から自動抽出するランダムN問！
 function startRandomN() {
-  // 🚨 安全対策
-  if (!ALL_WORDS || ALL_WORDS.length === 0) {
-    alert("⚠️ 単語データを読み込み中です。数秒待ってからもう一度お試しください。");
-    return;
-  }
-
+  if (!ALL_WORDS || ALL_WORDS.length === 0) return;
   const n = parseInt(document.getElementById('random-n-slider').value);
-  state.queue = ALL_WORDS.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
+  
+  // 同期中のテスト範囲からのみ抽出する
+  const lo = (activeRange === 'midterm') ? 0 : 141;
+  const hi = (activeRange === 'midterm') ? 140 : 282;
+  const rangeWords = ALL_WORDS.slice(lo, hi + 1);
+  
+  state.queue = rangeWords.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
   state.current = 0; 
   state.results = [];
   
@@ -918,7 +822,6 @@ function finishQuiz(isExit) {
   showScreen('screen-result');
 }
 
-// 👑 ホーム画面にランキングを表示
 function updateStats() {
   document.getElementById('stat-total').textContent = state.learnedCount;
   document.getElementById('stat-sessions').textContent = state.sessions;
@@ -943,7 +846,6 @@ function updateStats() {
   }
 }
 
-// 👑 ランキングモーダルを開く
 function openLeaderboardModal() {
   document.getElementById('leaderboard-modal').classList.add('open');
   const boardEl = document.getElementById('leaderboard-content-full');
@@ -965,45 +867,38 @@ function openLeaderboardModal() {
   });
 }
 
-// ✏️ ニックネームモーダルを開く
 function openNicknameModal() {
   document.getElementById('nickname-input').value = currentNickname || (auth.currentUser ? auth.currentUser.displayName : "");
   document.getElementById('nickname-modal').classList.add('open');
 }
 
-// ✏️ ニックネームを保存
 async function saveNickname() {
   const newName = document.getElementById('nickname-input').value.trim();
   if (!newName) { alert("ニックネームを入力してください"); return; }
   
   if (!isGuest && auth.currentUser) {
     try {
-      await db.collection('users').doc(auth.currentUser.uid).set({
-        nickname: newName
-      }, { merge: true });
-      
+      await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true });
       currentNickname = newName;
       document.getElementById('user-info').textContent = `👤 ${newName}`;
-      
-      await saveScoreToLeaderboard({
-        learned: state.learnedCount,
-        totalAnswers: state.learnedCount + 10,
-        accuracy: 100 // 仮置き
-      });
-      
-      console.log("✅ ニックネームを保存・同期しました");
+      await saveScoreToLeaderboard({ learned: state.learnedCount, totalAnswers: state.learnedCount + 10, accuracy: 100 });
       document.getElementById('nickname-modal').classList.remove('open');
       updateStats(); 
-    } catch(e) {
-      console.error("ニックネーム保存エラー:", e);
-      alert("保存に失敗しました");
-    }
+    } catch(e) { alert("保存に失敗しました"); }
   }
 }
 
-// 📅 カウントダウン関連
+// 📅 設定用ポップアップの処理
+let popupSelectedRange = "final";
+function setPopupRange(rangeType) {
+  popupSelectedRange = rangeType;
+  document.getElementById('pop-range-mid').classList.toggle('selected', rangeType === 'midterm');
+  document.getElementById('pop-range-fin').classList.toggle('selected', rangeType === 'final');
+}
+
 function openTestDateModal() {
   document.getElementById('testdate-modal').classList.add('open');
+  setPopupRange(activeRange);
   if (testDate) {
     const y = testDate.getFullYear();
     const m = String(testDate.getMonth() + 1).padStart(2, '0');
@@ -1015,24 +910,35 @@ function openTestDateModal() {
   }
 }
 
-function setQuickTestDate(dateStr, timeStr) {
+function setQuickTestDate(dateStr, timeStr, rangeType) {
   document.getElementById('testdate-date').value = dateStr;
   document.getElementById('testdate-time').value = timeStr;
+  setPopupRange(rangeType);
 }
 
+// 🌟 データを「vocabulary/active_test」という共通の場所に一発保存！
 async function saveTestDate() {
   const dateVal = document.getElementById('testdate-date').value;
   const timeVal = document.getElementById('testdate-time').value || '12:00';
   if (!dateVal) { alert("日付を選択してください"); return; }
   
-  testDate = new Date(`${dateVal}T${timeVal}:00`);
+  const targetDate = new Date(`${dateVal}T${timeVal}:00`);
   
   if (!isGuest && auth.currentUser) {
     try {
-      await db.collection('users').doc(auth.currentUser.uid).set({ testDate: testDate.toISOString() }, { merge: true });
-      console.log("✅ テスト日をクラウドに保存しました");
-    } catch(e) { console.error("テスト日保存エラー:", e); }
+      // 全員共通のドキュメント「vocabulary/active_test」にテスト日と現在の試験範囲をまとめて保存
+      await db.collection('vocabulary').doc('active_test').set({
+        testDate: targetDate.toISOString(),
+        activeRange: popupSelectedRange
+      }, { merge: true });
+      
+      testDate = targetDate;
+      activeRange = popupSelectedRange;
+      console.log("✅ 共通テスト目標と範囲をクラウド全員と同期しました");
+    } catch(e) { console.error("共通データ保存エラー:", e); }
   } else {
+    testDate = targetDate;
+    activeRange = popupSelectedRange;
     localStorage.setItem('tanGO_testdate', testDate.toISOString());
   }
 
@@ -1046,6 +952,7 @@ function startCountdown() {
   countdownTimer = setInterval(tickCountdown, 1000);
 }
 
+// 🌟 カウントダウンと、それに連動した「正確なテスト範囲別」ノルマ計算！
 function tickCountdown() {
   const labelEl = document.getElementById('countdown-label');
   const daysEl = document.getElementById('countdown-days');
@@ -1062,12 +969,13 @@ function tickCountdown() {
 
   const now = new Date();
   const diff = testDate - now;
+  const rangeName = (activeRange === 'midterm') ? "中間範囲" : "期末範囲";
 
   if (diff <= 0) {
-    labelEl.textContent = 'テスト当日！';
+    labelEl.textContent = `${rangeName} テスト当日！`;
     daysEl.textContent = '0';
     hmsEl.textContent = '00:00:00';
-    normaEl.innerHTML = '<div class="norma-badge">🎯 頑張れ！</div>';
+    normaEl.innerHTML = '<div class="norma-badge">🎯 頑張れ！本番開始！</div>';
     return;
   }
 
@@ -1078,21 +986,33 @@ function tickCountdown() {
   const secs = totalSec % 60;
   
   const pad = n => String(n).padStart(2,'0');
-  const y = testDate.getFullYear();
-  const mo = testDate.getMonth() + 1;
-  const d = testDate.getDate();
-  const h = testDate.getHours();
-  const mi = testDate.getMinutes();
   
-  labelEl.textContent = `テストまで（${y}/${pad(mo)}/${pad(d)} ${pad(h)}:${pad(mi)}）`;
+  labelEl.textContent = `${rangeName}まで（${testDate.getFullYear()}/${pad(testDate.getMonth() + 1)}/${pad(testDate.getDate())} ${pad(testDate.getHours())}:${pad(testDate.getMinutes())}）`;
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 
-  const TOTAL = ALL_WORDS.length > 0 ? ALL_WORDS.length : 283;
+  // 🌟 ノルマ計算を現在の「同期中テスト範囲の単語数（141 or 142語）」基準に完全最適化！
+  const rangeTotal = (activeRange === 'midterm') ? 141 : 142; 
   const learned = state.learnedCount;
-  const remaining = Math.max(0, TOTAL - learned);
+  
+  // 今回のターゲット範囲における、未完成の残単語数を概算
+  const remaining = Math.max(0, rangeTotal - (learned % rangeTotal)); 
   const norma = Math.ceil(remaining / (days + 1));
   normaEl.innerHTML = `<div class="norma-badge">📚 今日のノルマ: ${norma}語</div>`;
+}
+
+// tanGOエフェクト再生
+function playTangoEffect(callback) {
+  const screen = document.getElementById('transition-screen');
+  const logo = document.getElementById('tango-logo');
+  screen.classList.remove('transition-fade-out');
+  screen.classList.add('active');
+  logo.innerHTML = '<span class="tango-tan">tan</span><span class="tango-go">GO!!</span>';
+  setTimeout(() => {
+    screen.classList.add('transition-fade-out');
+    callback();
+    setTimeout(() => { screen.classList.remove('active'); }, 300);
+  }, 1000);
 }
 </script>
 </body>
