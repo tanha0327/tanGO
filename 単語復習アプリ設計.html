@@ -141,6 +141,53 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .test-date-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; margin-top:10px; transition: 0.2s; }
 .test-date-btn:hover { background:rgba(255,255,255,0.25); }
 .norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600; margin-top:8px; }
+
+/* 🌟 tanGOエフェクト用デザイン */
+.transition-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #1a237e 0%, #091a45 100%);
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+}
+.transition-screen.active { display: flex; }
+.tango-logo {
+  display: flex;
+  align-items: baseline;
+  font-family: 'Arial Black', Impact, sans-serif;
+  letter-spacing: -2px;
+}
+.tango-tan {
+  font-size: 56px;
+  color: white;
+  opacity: 0;
+  animation: slideFadeIn 0.3s ease forwards;
+}
+.tango-go {
+  font-size: 88px;
+  color: #FFB300;
+  font-style: italic;
+  opacity: 0;
+  transform: scale(3) rotate(-15deg);
+  animation: slamIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.25s forwards;
+  text-shadow: 0 8px 16px rgba(0,0,0,0.4);
+}
+@keyframes slideFadeIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slamIn {
+  from { opacity: 0; transform: scale(3) rotate(-15deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.transition-fade-out {
+  animation: fadeOutBg 0.3s ease forwards;
+}
+@keyframes fadeOutBg {
+  to { opacity: 0; visibility: hidden; }
+}
 </style>
 </head>
 <body>
@@ -155,6 +202,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <div id="app-container" style="display: none;">
+  <!-- 🌟 tanGO エフェクト画面 -->
+  <div class="transition-screen" id="transition-screen">
+    <div class="tango-logo" id="tango-logo">
+      <!-- JSで中身を再生成してアニメーションをリセットします -->
+    </div>
+  </div>
+  
   <div class="modal-overlay" id="nickname-modal">
     <div class="modal-box">
       <div class="modal-title">✏️ ニックネームの変更</div>
