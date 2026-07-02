@@ -713,34 +713,29 @@ function openRandomModal() {
 // 🚀 ユーザーの進捗に合わせた【周回演習】の開始処理（やってない問題だけを昇順で抽出！）
 // 🚀 ユーザーの進捗に合わせた【周回演習】の開始処理（安全装置付き！）
 let isRandomMode = false; 
+let isReviewMode = false; // 🌟 復習モード用フラグを新設！
+// 🚀 ユーザーの進捗に合わせた【周回演習】の開始処理
 function startRoundStudy() {
-  // 🚨 安全対策1：単語データがクラウドからまだ届いていない場合
   if (!ALL_WORDS || ALL_WORDS.length === 0) {
-    alert("⏳ 単語データをクラウドから読み込み中です。\n1〜2秒だけ待ってからもう一度押してください！\n（何回押してもダメな場合は、一度 Ctrl+F5 で再読み込みしてください）");
+    alert("⏳ 単語データをクラウドから読み込み中です！");
     return;
   }
   isRandomMode = false;
+  isReviewMode = false; // 🌟 通常周回はオフ
 
   const lo = (activeRange === 'midterm') ? 0 : 141;
   const hi = (activeRange === 'midterm') ? 140 : 282;
   const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
   
-  // 現在のテスト範囲の単語を抜き出す
   const rangeWords = ALL_WORDS.slice(lo, hi + 1);
-  
-  // まだ解いていない単語だけを抽出
   const unsubmittedWords = rangeWords.filter(w => !uRoundAnswers.includes(w.id));
   
-  // 🚨 安全対策2：もし未解答の単語が0個（すでに100%）なのにボタンを押した場合
   if (unsubmittedWords.length === 0) {
     alert("🎉 この周回の単語はすべて解き終わっています！\n自動的に次の周回にリセットして進みます！");
     uCurrentRound++;
     uRoundAnswers = [];
     if (!isGuest && auth.currentUser) {
-      db.collection('users').doc(auth.currentUser.uid).set({
-        currentRound: uCurrentRound,
-        roundAnswers: uRoundAnswers
-      }, { merge: true });
+      db.collection('users').doc(auth.currentUser.uid).set({ currentRound: uCurrentRound, roundAnswers: uRoundAnswers }, { merge: true });
     }
     refreshUI();
     return;
@@ -750,16 +745,14 @@ function startRoundStudy() {
   state.current = 0;
   state.results = [];
 
-  playTangoEffect(() => {
-    showScreen('screen-quiz');
-    renderQuestion();
-  });
+  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
-// 🎲 ランダムN問（息抜き・腕試し用）
+// 🎲 ランダムN問
 function startRandomN() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) return;
   isRandomMode = true;
+  isReviewMode = false; // 🌟 ランダム演習はオフ
   
   const n = parseInt(document.getElementById('random-n-slider').value);
   const lo = (activeRange === 'midterm') ? 0 : 141;
@@ -771,11 +764,7 @@ function startRandomN() {
   state.results = [];
   
   document.getElementById('random-modal').classList.remove('open');
-  
-  playTangoEffect(() => {
-    showScreen('screen-quiz');
-    renderQuestion();
-  });
+  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
 // 🔥 間違えた単語だけを抽出する「復習（復讐）モード」
@@ -785,31 +774,29 @@ function startReviewMode() {
     return;
   }
 
-  // 現在のテスト範囲を取得
   const lo = (activeRange === 'midterm') ? 0 : 141;
   const hi = (activeRange === 'midterm') ? 140 : 282;
   const rangeWords = ALL_WORDS.slice(lo, hi + 1);
 
-  // 1回でも間違えた記録がある（wrong > 0）単語だけを抽出！
-  const wrongWords = rangeWords.filter(w => uWordHistory[w.id] && uWordHistory[w.id].wrong > 0);
+  // 🌟 新ロジック：間違えた回数(wrong) ＞ 復習で正解した回数(reviewed) の単語だけを抽出！
+  const wrongWords = rangeWords.filter(w => {
+    const h = uWordHistory[w.id];
+    return h && (h.wrong || 0) > (h.reviewed || 0);
+  });
 
   if (wrongWords.length === 0) {
-    alert("✨ 素晴らしい！今の範囲で間違えた単語は1つもありません！完璧です！");
+    alert("✨ 素晴らしい！現在、要復習の単語は1つもありません！完璧です！");
     return;
   }
 
-  // 復習モード開始（進捗%には影響させないため、isRandomModeをtrueにする）
   isRandomMode = true; 
+  isReviewMode = true; // 🌟 復習モードをオン！
   
-  // 順番を覚えないようにランダムシャッフルして出題
   state.queue = wrongWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
   state.current = 0;
   state.results = [];
 
-  playTangoEffect(() => {
-    showScreen('screen-quiz');
-    renderQuestion();
-  });
+  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
 function renderQuestion() {
