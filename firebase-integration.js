@@ -461,6 +461,7 @@ function loginAsGuest() {
 }
 
 // 🔐 Googleログイン機能（大復活！）
+// 🔐 Googleログイン機能（大復活！）
 function loginWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).then(() => {
@@ -468,3 +469,4 @@ function loginWithGoogle() {
   }).catch((error) => {
     alert("ログインエラー: " + error.message);
   });
+}
