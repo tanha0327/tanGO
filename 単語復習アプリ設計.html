@@ -673,13 +673,17 @@ function refreshUI() {
 
   // 👇👇👇 これを一番下に追加！ 👇👇👇
   // 4. 復習単語のカウントと色変え処理
+  // 4. 復習単語のカウントと色変え処理
   if (ALL_WORDS && ALL_WORDS.length > 0) {
     const lo = (activeRange === 'midterm') ? 0 : 141;
     const hi = (activeRange === 'midterm') ? 140 : 282;
     const rangeWords = ALL_WORDS.slice(lo, hi + 1);
     
-    // 間違えた回数が1回以上の単語をカウント
-    const wrongCount = rangeWords.filter(w => uWordHistory[w.id] && uWordHistory[w.id].wrong > 0).length;
+    // 🌟 修正：まだ復讐が果たされていない（wrong > reviewed）単語だけをカウント！
+    const wrongCount = rangeWords.filter(w => {
+      const h = uWordHistory[w.id];
+      return h && (h.wrong || 0) > (h.reviewed || 0);
+    }).length;
 
     const reviewNumEl = document.getElementById('stat-review-count');
     const reviewCardEl = document.getElementById('card-review');
@@ -687,12 +691,10 @@ function refreshUI() {
     reviewNumEl.textContent = wrongCount;
     
     if (wrongCount > 0) {
-      // 復習がある場合：数字を赤くして、パネルの背景もほんのり赤く警告！
       reviewNumEl.style.color = '#c62828';
       reviewCardEl.style.background = '#fff5f5';
       reviewCardEl.style.borderColor = '#ef9a9a';
     } else {
-      // 復習がない場合：通常の黒文字（背景が白のため白文字だと見えないので黒にします）と白背景
       reviewNumEl.style.color = '#1a1a1a';
       reviewCardEl.style.background = 'white';
       reviewCardEl.style.borderColor = '#e5e5e0';
@@ -814,6 +816,7 @@ function renderQuestion() {
 }
 
 // 🌟 解答が送信された瞬間に、裏でクラウドデータベースへリアルタイム保存！
+// 🌟 解答が送信された瞬間の処理（周回管理 ＆ 復習成功カウンター連動版）
 async function submitAnswer() {
   const ans = document.getElementById('quiz-answer').value.trim().toLowerCase();
   const currentItem = state.queue[state.current];
@@ -830,12 +833,21 @@ async function submitAnswer() {
   uTotalAnswers++;
   if(grade === 'correct') uTotalCorrect++;
   
-  // 各単語の履歴更新
-  if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0 };
+  // ─── 🌟 ここからが新しい履歴更新ロジック ───
+  if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
   uWordHistory[wordId].solved++;
-  if (grade === 'wrong') uWordHistory[wordId].wrong++;
+  
+  if (grade === 'wrong') {
+    uWordHistory[wordId].wrong++; // 間違えたら通常通りカウントアップ
+  }
+  
+  // 復習モードで、かつ見事正解（復讐成功）した場合のみ、reviewedを＋1する！
+  if (isReviewMode && grade === 'correct') {
+    uWordHistory[wordId].reviewed = (uWordHistory[wordId].reviewed || 0) + 1;
+  }
+  // ─────────────────────────────────────────
 
-  // 🌟 周回モードなら、解いたフラグ（uRoundAnswers）に追加
+  // 周回モードなら、解いたフラグ（uRoundAnswers）に追加
   if (!isRandomMode && !uRoundAnswers.includes(wordId)) {
     uRoundAnswers.push(wordId);
   }
@@ -864,7 +876,6 @@ async function submitAnswer() {
     
     // 👑 ランキング用ドキュメントも同時にリアルタイム更新
     const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
-    // ランキングソート用の累積進捗パーセント（1周クリア=100%, 2周目の50%=150%）
     const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / rangeTotal) * 100);
     const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
