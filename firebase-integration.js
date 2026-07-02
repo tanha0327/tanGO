@@ -58,12 +58,13 @@ async function initDictionary() {
     }
 
     // 🌟 ここで全単語の英語を「入力しやすい形」に一斉クリーニング！
+    // 🌟 ここで全単語の英語を「入力しやすい形」に一斉クリーニング！
     ALL_WORDS.forEach(w => {
       w.en = w.en
         .replace(/\[.*?\]/g, '') // [give]などを削除
         .replace(/\(.*?\)/g, '') // (with ...)などを削除
         .replace(/〈.*?〉/g, 'someone ') // 〈人〉を someone に変換
-        .replace(/[…～~]/g, '') // 記号を削除
+        .replace(/[…～~・\.]/g, '') // 👈 ピリオド「.」も追加して完全抹殺！
         .replace(/\s+/g, ' ') // 連続するスペースを1つに
         .trim();
     });
