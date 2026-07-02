@@ -459,3 +459,12 @@ function loginAsGuest() {
   testDate = new Date("2026-07-03T09:10:00"); activeRange = "final";
   startCountdown(); refreshUI();
 }
+
+// 🔐 Googleログイン機能（大復活！）
+function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(() => {
+    window.location.reload();
+  }).catch((error) => {
+    alert("ログインエラー: " + error.message);
+  });
