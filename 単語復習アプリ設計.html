@@ -841,9 +841,9 @@ async function submitAnswer() {
     uWordHistory[wordId].wrong++; // 間違えたら通常通りカウントアップ
   }
   
-  // 復習モードで、かつ見事正解（復讐成功）した場合のみ、reviewedを＋1する！
+  // 🌟 復習モードで見事正解したら、過去の間違い回数とチャラにして「一発クリア」！
   if (isReviewMode && grade === 'correct') {
-    uWordHistory[wordId].reviewed = (uWordHistory[wordId].reviewed || 0) + 1;
+    uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
   }
   // ─────────────────────────────────────────
 
