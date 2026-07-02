@@ -240,6 +240,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="margin-bottom:1rem;">
         <button class="big-btn btn-primary" style="padding: 15px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(45,125,210,0.3);" id="btn-main-study" onclick="startRoundStudy()">🚀 1周目をスタート</button>
         <button class="big-btn btn-secondary" onclick="openRandomModal()">🎲 テスト範囲からランダムN問</button>
+
+        <button class="big-btn btn-wrong-red" style="margin-top: 8px;" id="btn-review" onclick="startReviewMode()">🔥 復習リスト (間違えた単語を特訓)</button>
       </div>
     </div>
 
@@ -738,6 +740,40 @@ function startRandomN() {
   
   document.getElementById('random-modal').classList.remove('open');
   
+  playTangoEffect(() => {
+    showScreen('screen-quiz');
+    renderQuestion();
+  });
+}
+
+// 🔥 間違えた単語だけを抽出する「復習（復讐）モード」
+function startReviewMode() {
+  if (!ALL_WORDS || ALL_WORDS.length === 0) {
+    alert("⏳ 単語データを読み込み中です！");
+    return;
+  }
+
+  // 現在のテスト範囲を取得
+  const lo = (activeRange === 'midterm') ? 0 : 141;
+  const hi = (activeRange === 'midterm') ? 140 : 282;
+  const rangeWords = ALL_WORDS.slice(lo, hi + 1);
+
+  // 1回でも間違えた記録がある（wrong > 0）単語だけを抽出！
+  const wrongWords = rangeWords.filter(w => uWordHistory[w.id] && uWordHistory[w.id].wrong > 0);
+
+  if (wrongWords.length === 0) {
+    alert("✨ 素晴らしい！今の範囲で間違えた単語は1つもありません！完璧です！");
+    return;
+  }
+
+  // 復習モード開始（進捗%には影響させないため、isRandomModeをtrueにする）
+  isRandomMode = true; 
+  
+  // 順番を覚えないようにランダムシャッフルして出題
+  state.queue = wrongWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
+  state.current = 0;
+  state.results = [];
+
   playTangoEffect(() => {
     showScreen('screen-quiz');
     renderQuestion();
