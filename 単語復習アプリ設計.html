@@ -582,6 +582,16 @@ async function initDictionary() {
       await db.collection('vocabulary').doc('midterm').set({ title: "中間 (1401〜1541)", words: ALL_WORDS.slice(0, 141) });
       await db.collection('vocabulary').doc('final').set({ title: "期末 (1542〜1683)", words: ALL_WORDS.slice(141) });
     }
+
+    ALL_WORDS.forEach(w => {
+      w.en = w.en
+        .replace(/\[.*?\]/g, '') 
+        .replace(/\(.*?\)/g, '') 
+        .replace(/〈.*?〉/g, 'someone ') 
+        .replace(/[…～~・\.]/g, '') // 👈 これがピリオドも消す完全版！
+        .replace(/\s+/g, ' ') 
+        .trim();
+    });
   } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
@@ -1092,6 +1102,15 @@ function loginAsGuest() {
   document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
   testDate = new Date("2026-07-03T09:10:00"); activeRange = "final";
   startCountdown(); refreshUI();
+}
+
+function loginWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).then(() => {
+    window.location.reload();
+  }).catch((error) => {
+    alert("ログインエラー: " + error.message);
+  });
 }
 </script>
 </body>
