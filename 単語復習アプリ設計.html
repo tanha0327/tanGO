@@ -64,7 +64,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .btn-primary { background: #2D7DD2; color: white; }
 .btn-secondary { background: white; color: #1a1a1a; border: 1px solid #e0e0da; }
 .btn-wrong-red { background: #c62828; color: white; font-size: 20px; font-weight: 700; }
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 0.8rem; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.8rem; }
 .stat-card { background: white; border: 1px solid #e5e5e0; border-radius: 10px; padding: 0.75rem; text-align: center; }
 .stat-num { font-size: 22px; font-weight: 700; color: #1a1a1a; }
 .stat-lbl { font-size: 11px; color: #888; margin-top: 3px; }
@@ -234,6 +234,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
         <div class="stat-card">
           <div class="stat-num" id="stat-total-solved">0</div><div class="stat-lbl">総解答回数</div>
+        </div>
+        <!-- 👇 4つ目：タップできる要復習パネル 👇 -->
+        <div class="stat-card" style="cursor:pointer; transition:0.2s;" id="card-review" onclick="startReviewMode()">
+          <div class="stat-num" id="stat-review-count" style="color: #1a1a1a;">0</div><div class="stat-lbl">要復習 (タップで開始)</div>
         </div>
       </div>
 
@@ -666,6 +670,34 @@ function refreshUI() {
   }
   
   updateLeaderboardDisplay();
+
+  // 👇👇👇 これを一番下に追加！ 👇👇👇
+  // 4. 復習単語のカウントと色変え処理
+  if (ALL_WORDS && ALL_WORDS.length > 0) {
+    const lo = (activeRange === 'midterm') ? 0 : 141;
+    const hi = (activeRange === 'midterm') ? 140 : 282;
+    const rangeWords = ALL_WORDS.slice(lo, hi + 1);
+    
+    // 間違えた回数が1回以上の単語をカウント
+    const wrongCount = rangeWords.filter(w => uWordHistory[w.id] && uWordHistory[w.id].wrong > 0).length;
+
+    const reviewNumEl = document.getElementById('stat-review-count');
+    const reviewCardEl = document.getElementById('card-review');
+    
+    reviewNumEl.textContent = wrongCount;
+    
+    if (wrongCount > 0) {
+      // 復習がある場合：数字を赤くして、パネルの背景もほんのり赤く警告！
+      reviewNumEl.style.color = '#c62828';
+      reviewCardEl.style.background = '#fff5f5';
+      reviewCardEl.style.borderColor = '#ef9a9a';
+    } else {
+      // 復習がない場合：通常の黒文字（背景が白のため白文字だと見えないので黒にします）と白背景
+      reviewNumEl.style.color = '#1a1a1a';
+      reviewCardEl.style.background = 'white';
+      reviewCardEl.style.borderColor = '#e5e5e0';
+    }
+  }
 }
 
 // 🎲 ランダムN問の最大値を現在の範囲で自動変動させる
