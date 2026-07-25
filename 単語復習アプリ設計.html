@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <!-- GSAPアニメーションライブラリ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<!-- 最新の Motion (v12) アニメーションライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/motion@latest/dist/motion.global.js"></script>
 <script>
 // ==========================================
 // Firebase設定
@@ -1140,6 +1142,7 @@ function tickCountdown() {
 // tanGOエフェクト再生
 // 🌟 GSAPを使った超ド派手な弾けるイントロ
 // 🌟 GSAPを使った超ド派手な弾けるイントロ (GSAP Style)
+// 🌟 Motion (v12) を使った約3秒間の複雑＆超絶ポップなイントロ
 function playTangoEffect(callback) {
   const screen = document.getElementById('transition-screen');
   
@@ -1147,7 +1150,7 @@ function playTangoEffect(callback) {
   screen.style.display = 'flex';
   screen.style.opacity = '1';
   
-  // 指定されたクラスを使って文字を組み立てる
+  // 文字を組み立てる
   screen.innerHTML = `
     <div id="tango-logo">
       <span class="tango-char">t</span>
@@ -1159,59 +1162,60 @@ function playTangoEffect(callback) {
     </div>
   `;
 
-  // タイムラインを作成（アニメーションを順番に実行）
-  const tl = gsap.timeline({
-    onComplete: () => {
-      callback(); // クイズ画面を裏で描画
-      // 最後はスーッとフェードアウト
-      gsap.to(screen, { opacity: 0, duration: 0.3, onComplete: () => screen.style.display = 'none' });
-    }
-  });
+  // Motionの強力な関数を呼び出し
+  const { animate, stagger } = Motion;
 
-  // 🎬 Step 1: 下から回転しながら強力にボヨーン！と飛び出す
-  tl.fromTo(".tango-char", 
-    { 
-      y: window.innerHeight, // 画面の一番下から
-      scale: 0.2, 
-      rotation: 90, 
-      opacity: 0 
-    }, 
-    { 
-      y: 0, 
-      scale: 1, 
-      rotation: 0, 
-      opacity: 1, 
-      stagger: 0.06, // 0.06秒間隔でダダダッ！と出現
-      duration: 0.8, 
-      ease: "back.out(2.5)" // back.outで強くバウンドさせる
-    }
-  )
-  // 🎬 Step 2: 「GO!」の部分だけ、心臓のようにドクン！と強調
-  .to(".char-g, .char-o, .char-ex", 
-    { 
-      scale: 1.4, 
-      rotation: "random(-15, 15)", // 左右に少し傾ける
-      duration: 0.15, 
-      yoyo: true,  // 元のサイズに戻る
-      repeat: 1,   // 1回繰り返す
-      ease: "power2.out" 
-    }, 
-    "-=0.15" // Step 1が終わる少し前に被せて開始
-  )
-  // 🎬 Step 3: 全文字がバラバラの方向にカメラに向かってパーン！と弾け飛ぶ
-  .to(".tango-char", 
-    { 
-      scale: 5,        // 画面手前に迫ってくる
-      opacity: 0,      // 消え去る
-      x: () => gsap.utils.random(-300, 300), // X方向にランダムに散らす
-      y: () => gsap.utils.random(-300, 300), // Y方向にランダムに散らす
-      rotation: () => gsap.utils.random(-60, 60), 
-      duration: 0.5, 
-      stagger: 0.02,   // 散る時もわずかにズラす
-      ease: "power4.in" // 一気に加速して消える（GSAP特有の滑らかさ）
-    }, 
-    "+=0.1" // ドクン！のあと0.1秒だけ余韻を残して爆発
-  );
+  // 🎬 約3秒間の複雑な「5段階シーケンス」を定義
+  const sequence = [
+    // 【第1段階】0.0s〜1.2s：上空から超バウンド落下
+    [
+      ".tango-char",
+      { y: [-600, 0], scale: [0.3, 1], rotate: [-90, 0], opacity: [0, 1] },
+      { duration: 0.8, delay: stagger(0.08), type: "spring", bounce: 0.65 }
+    ],
+    // 【第2段階】1.2s〜1.8s：波打つウェーブアクション
+    [
+      ".tango-char",
+      { y: [0, -30, 0] },
+      { duration: 0.4, delay: stagger(0.05, { from: "first" }) }
+    ],
+    // 【第3段階】1.6s〜2.2s：「GO!」の心臓ドクン！
+    // ※ at: "-0.2" を使って、前のウェーブが終わる前に食い気味でスタートさせる！
+    [
+      ".char-g, .char-o, .char-ex",
+      { scale: [1, 1.5, 1], rotate: [0, 15, -15, 0] },
+      { duration: 0.5, delay: stagger(0.05), at: "-0.2" } 
+    ],
+    // 【第4段階】2.2s〜2.4s：大爆発の前の「タメ」（全体がグッと潰れる）
+    [
+      ".tango-char",
+      { scaleX: [1, 1.3], scaleY: [1, 0.7], y: [0, 20] },
+      { duration: 0.2, type: "spring" }
+    ],
+    // 【第5段階】2.4s〜3.0s：カメラに向かって大爆発！！
+    [
+      ".tango-char",
+      {
+        scale: [null, 6],    // 画面に迫ってくる
+        opacity: [1, 0],     // 迫りながら消える
+        // (i) は文字の順番。真ん中(2.5)を基準に左右へ強烈に散らす！
+        x: (i) => (i - 2.5) * 200, 
+        y: () => (Math.random() - 0.5) * 300 
+      },
+      { duration: 0.5, ease: "easeIn", delay: stagger(0.02, { from: "center" }) }
+    ]
+  ];
+
+  // シーケンスを再生！
+  animate(sequence).then(() => {
+    // 爆発が終わった瞬間に裏でクイズ画面を描画
+    callback();
+
+    // 最後にイエローの背景をスーッとフェードアウトさせてゲーム開始
+    animate(screen, { opacity: 0 }, { duration: 0.3 }).then(() => {
+      screen.style.display = 'none';
+    });
+  });
 }
 
 // 🔓 ログアウト・ゲストログイン
