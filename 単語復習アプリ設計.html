@@ -53,32 +53,28 @@ const state = { queue: [], current: 0, results: [] };
 <style>
 
 /* 🌟 GSAPアニメーション用の超ポップなスタイル */
-#transition-screen {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background-color: #FFD700; /* ド派手な黄色 */
-  z-index: 9999;
-  display: none; /* 初期は非表示 */
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
+/* 🌟 新しい指定カラーパレット */
+:root {
+  --charcoal-blue: #264653;
+  --verdigris: #2a9d8f;
+  --tuscan-sun: #e9c46a;
+  --sandy-brown: #f4a261;
+  --burnt-peach: #e76f51;
 }
 
-#tango-logo {
-  font-family: 'Arial Black', Impact, sans-serif;
-  font-size: clamp(3.5rem, 12vw, 7rem); /* スマホでもPCでもいい感じのデカさに */
-  font-weight: 900;
-  display: flex;
-  gap: 2px;
+/* 🌟 GSAPアニメーション用のリッチなスタイル */
+/* 🌟 GSAPアニメーション用カラーパレット */
+:root {
+  --charcoal-blue: #264653;
+  --verdigris: #2a9d8f;
+  --tuscan-sun: #e9c46a;
+  --sandy-brown: #f4a261;
+  --burnt-peach: #e76f51;
 }
 
-.tango-char {
-  display: inline-block;
-  color: #1976D2; /* 鮮やかな青 */
-  /* 立体感のあるポップな影（アメコミ風） */
-  text-shadow: 4px 4px 0px #fff, 8px 8px 0px #0d47a1; 
-}w  w                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               d
+/* ==========================================
+   ベース設定・UIデザイン
+========================================== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; overflow-y: auto; overflow-x: hidden; }
 .app { max-width: 520px; margin: 0 auto; padding: 0.8rem 0.8rem; }
@@ -124,16 +120,49 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .test-date-btn:hover { background:rgba(255,255,255,0.25); }
 .norma-badge { display:inline-block; background:rgba(255,255,255,0.2); border-radius:99px; padding:3px 12px; font-size:12px; font-weight:600; margin-top:8px; }
 
-/* tanGOエフェクト用デザイン */
-.transition-screen { display: none; position: fixed; inset: 0; background: linear-gradient(135deg, #1a237e 0%, #091a45 100%); z-index: 999; align-items: center; justify-content: center; }
-.transition-screen.active { display: flex; }
-.tango-logo { display: flex; align-items: baseline; font-family: 'Arial Black', Impact, sans-serif; letter-spacing: -2px; }
-.tango-tan { font-size: 56px; color: white; opacity: 0; animation: slideFadeIn 0.3s ease forwards; }
-.tango-go { font-size: 88px; color: #FFB300; font-style: italic; opacity: 0; transform: scale(3) rotate(-15deg); animation: slamIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.25s forwards; text-shadow: 0 8px 16px rgba(0,0,0,0.4); }
-@keyframes slideFadeIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes slamIn { from { opacity: 0; transform: scale(3) rotate(-15deg); } to { opacity: 1; transform: scale(1) rotate(0deg); } }
-.transition-fade-out { animation: fadeOutBg 0.3s ease forwards; }
-@keyframes fadeOutBg { to { opacity: 0; visibility: hidden; } }
+/* ==========================================
+   🌟 GSAPアニメーション用のリッチなスタイル
+========================================== */
+#transition-screen {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: var(--tuscan-sun);
+  z-index: 9999;
+  display: none; 
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  /* 放射状のグラデーションで立体感を出す */
+  background: radial-gradient(circle, var(--tuscan-sun) 30%, #d4b05a 100%);
+}
+
+#tango-logo {
+  font-family: 'Arial Black', Impact, sans-serif;
+  font-size: clamp(4rem, 15vw, 9rem);
+  font-weight: 900;
+  display: flex;
+  letter-spacing: -2px;
+}
+
+.tango-char {
+  display: inline-block;
+  color: var(--charcoal-blue);
+  text-shadow: 4px 4px 0px #fff, 10px 10px 0px var(--verdigris); 
+  transform-origin: center center;
+}
+
+/* 「G」「O」の色と影のカスタマイズ */
+.tango-char.char-g, .tango-char.char-o {
+  color: #fff;
+  text-shadow: 4px 4px 0px var(--charcoal-blue), 10px 10px 0px var(--verdigris);
+}
+
+/* 「!」の色と影（Burnt Peach と Sandy Brownの組み合わせ） */
+.tango-char.char-ex {
+  color: var(--burnt-peach);
+  text-shadow: 4px 4px 0px #fff, 10px 10px 0px var(--sandy-brown);
+}
 </style>
 </head>
 <body>
@@ -1110,55 +1139,78 @@ function tickCountdown() {
 
 // tanGOエフェクト再生
 // 🌟 GSAPを使った超ド派手な弾けるイントロ
+// 🌟 GSAPを使った超ド派手な弾けるイントロ (GSAP Style)
 function playTangoEffect(callback) {
   const screen = document.getElementById('transition-screen');
   
-  // 画面を表示＆背景を黄色にリセット
+  // 画面を表示状態にリセット
   screen.style.display = 'flex';
   screen.style.opacity = '1';
-  screen.style.backgroundColor = '#FFD700';
   
-  // ロゴの中身を「1文字ずつ」に分割して再構築
-  // GとOは白にして青い影、!は赤にして目立たせる！
+  // 指定されたクラスを使って文字を組み立てる
   screen.innerHTML = `
     <div id="tango-logo">
       <span class="tango-char">t</span>
       <span class="tango-char">a</span>
       <span class="tango-char">n</span>
-      <span class="tango-char" style="color: #FFF; text-shadow: 4px 4px 0px #1976D2, 8px 8px 0px #0d47a1;">G</span>
-      <span class="tango-char" style="color: #FFF; text-shadow: 4px 4px 0px #1976D2, 8px 8px 0px #0d47a1;">O</span>
-      <span class="tango-char" style="color: #FF5252; text-shadow: 4px 4px 0px #FFF, 8px 8px 0px #b71c1c;">!</span>
+      <span class="tango-char char-g">G</span>
+      <span class="tango-char char-o">O</span>
+      <span class="tango-char char-ex">!</span>
     </div>
   `;
 
-  // GSAPタイムラインを作成
+  // タイムラインを作成（アニメーションを順番に実行）
   const tl = gsap.timeline({
     onComplete: () => {
-      callback(); // 裏側でクイズの画面を描画する
-      // 最後にサッとフェードアウトして消える
+      callback(); // クイズ画面を裏で描画
+      // 最後はスーッとフェードアウト
       gsap.to(screen, { opacity: 0, duration: 0.3, onComplete: () => screen.style.display = 'none' });
     }
   });
 
-  // アニメーション1: 下から回転しながらボヨーン！と飛び出す
+  // 🎬 Step 1: 下から回転しながら強力にボヨーン！と飛び出す
   tl.fromTo(".tango-char", 
-    { y: 200, scale: 0, rotation: 45, opacity: 0 }, 
     { 
-      y: 0, scale: 1, rotation: 0, opacity: 1, 
-      stagger: 0.05, // 0.05秒ズレでダダダダッ！と連続発射
-      duration: 0.7, 
-      ease: "back.out(2.5)" // ボヨヨン！と弾ける強さ
+      y: window.innerHeight, // 画面の一番下から
+      scale: 0.2, 
+      rotation: 90, 
+      opacity: 0 
+    }, 
+    { 
+      y: 0, 
+      scale: 1, 
+      rotation: 0, 
+      opacity: 1, 
+      stagger: 0.06, // 0.06秒間隔でダダダッ！と出現
+      duration: 0.8, 
+      ease: "back.out(2.5)" // back.outで強くバウンドさせる
     }
   )
-  // アニメーション2: 「GO!」の文字だけ、心臓の鼓動のようにドクン！と膨らむ
-  .to(".tango-char:nth-child(4), .tango-char:nth-child(5), .tango-char:nth-child(6)", 
-    { scale: 1.3, rotation: -10, duration: 0.1, yoyo: true, repeat: 1, ease: "power1.inOut" }, 
-    "-=0.1" // 直前のアニメーションが終わる前に被せて開始
+  // 🎬 Step 2: 「GO!」の部分だけ、心臓のようにドクン！と強調
+  .to(".char-g, .char-o, .char-ex", 
+    { 
+      scale: 1.4, 
+      rotation: "random(-15, 15)", // 左右に少し傾ける
+      duration: 0.15, 
+      yoyo: true,  // 元のサイズに戻る
+      repeat: 1,   // 1回繰り返す
+      ease: "power2.out" 
+    }, 
+    "-=0.15" // Step 1が終わる少し前に被せて開始
   )
-  // アニメーション3: 全体が画面手前に向かってパーン！と弾け飛んで消える
+  // 🎬 Step 3: 全文字がバラバラの方向にカメラに向かってパーン！と弾け飛ぶ
   .to(".tango-char", 
-    { scale: 4, opacity: 0, duration: 0.3, stagger: 0.02, ease: "power2.in" }, 
-    "+=0.15" // ちょっとだけタメてから消え去る
+    { 
+      scale: 5,        // 画面手前に迫ってくる
+      opacity: 0,      // 消え去る
+      x: () => gsap.utils.random(-300, 300), // X方向にランダムに散らす
+      y: () => gsap.utils.random(-300, 300), // Y方向にランダムに散らす
+      rotation: () => gsap.utils.random(-60, 60), 
+      duration: 0.5, 
+      stagger: 0.02,   // 散る時もわずかにズラす
+      ease: "power4.in" // 一気に加速して消える（GSAP特有の滑らかさ）
+    }, 
+    "+=0.1" // ドクン！のあと0.1秒だけ余韻を残して爆発
   );
 }
 
