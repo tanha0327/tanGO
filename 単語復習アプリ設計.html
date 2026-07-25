@@ -1112,11 +1112,10 @@ function loginWithGoogle() {
 }
 
 // ==========================================
-// 🌟 夏休み明けテスト対応：超特大アップデートパッチ
-// （古いコードは消さず、このまま一番下に貼り付けるだけでOK！）
+// 🌟 夏休み明けテスト対応：超特大アップデートパッチ V2 (範囲別・完全独立システム)
+// （先ほど貼ったパッチをこれに上書きして差し替えてください！）
 // ==========================================
 
-// 新しい便利関数：現在の範囲の開始・終了・総数を返す
 function getActiveRangeInfo() {
   if (activeRange === 'midterm') return { lo: 0, hi: 140, total: 141, name: "中間範囲" };
   if (activeRange === 'final') return { lo: 141, hi: 282, total: 142, name: "期末範囲" };
@@ -1124,7 +1123,6 @@ function getActiveRangeInfo() {
   return { lo: 0, hi: 0, total: 0, name: "" };
 }
 
-// 辞書初期化のアップデート版（第3の範囲をFirestoreに登録＆結合）
 async function initDictionary() {
   try {
     const midDoc = await db.collection('vocabulary').doc('midterm').get();
@@ -1490,7 +1488,52 @@ async function initDictionary() {
   } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
-// UI更新関数のアップデート版
+// 🌟 データの読み込みを「現在の範囲」によって完全に切り替える！
+window.onload = () => {
+  auth.onAuthStateChanged(async (user) => {
+    if (user) {
+      document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
+      await initDictionary();
+      
+      try {
+        const targetDoc = await db.collection('vocabulary').doc('active_test').get();
+        if (targetDoc.exists) { const config = targetDoc.data(); if (config.testDate) testDate = new Date(config.testDate); if (config.activeRange) activeRange = config.activeRange; }
+      } catch(e) {}
+      
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          const data = userDoc.data(); 
+          if (data.nickname) currentNickname = data.nickname; 
+          
+          // 🔥 休み明けテスト(extra)が選ばれているなら、専用の白紙セーブデータを読み込む！
+          if (activeRange === 'extra') {
+            uCurrentRound = data.currentRound_extra || 1; // 1周目の0%からスタート！
+            uRoundAnswers = data.roundAnswers_extra || [];
+            uTotalAnswers = data.totalAnswers_extra || 0;
+            uTotalCorrect = data.totalCorrect_extra || 0;
+            uWordHistory = data.wordHistory_extra || {};
+          } else {
+            // 中間や期末の場合は、これまでの過去のセーブデータをそのままロード
+            if (data.currentRound !== undefined) uCurrentRound = data.currentRound;
+            if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers; 
+            if (data.totalAnswers !== undefined) uTotalAnswers = data.totalAnswers;
+            if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect; 
+            if (data.wordHistory !== undefined) uWordHistory = data.wordHistory;
+          }
+        }
+      } catch(e) {}
+      
+      const userInfo = document.getElementById('user-info');
+      if (userInfo) userInfo.textContent = `👤 ${currentNickname || user.displayName || user.email}`;
+      if (!isGuest) document.getElementById('btn-edit-nickname').style.display = 'block';
+      startCountdown(); refreshUI();
+    } else if (!isGuest) {
+      document.getElementById('login-screen').style.display = 'flex'; document.getElementById('app-container').style.display = 'none';
+    }
+  });
+};
+
 function refreshUI() {
   const info = getActiveRangeInfo();
   if (info.total === 0) return;
@@ -1551,7 +1594,12 @@ function startRoundStudy() {
   if (unsubmittedWords.length === 0) {
     alert("🎉 この周回の単語はすべて解き終わりました！次の周回に進みます！");
     uCurrentRound++; uRoundAnswers = [];
-    if (!isGuest && auth.currentUser) db.collection('users').doc(auth.currentUser.uid).set({ currentRound: uCurrentRound, roundAnswers: uRoundAnswers }, { merge: true });
+    if (!isGuest && auth.currentUser) {
+      const updates = {};
+      if (activeRange === 'extra') { updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers; } 
+      else { updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers; }
+      db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
+    }
     refreshUI(); return;
   }
   state.queue = unsubmittedWords.map(w => ({ word: w, dir: 'jp-en' })); state.current = 0; state.results = [];
@@ -1582,6 +1630,7 @@ function startReviewMode() {
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
+// 🌟 セーブデータの保存も、範囲ごとに分ける！
 async function submitAnswer() {
   const ans = document.getElementById('quiz-answer').value.trim().toLowerCase();
   const currentItem = state.queue[state.current]; const correct = currentItem.word.en; const wordId = currentItem.word.id;
@@ -1601,16 +1650,27 @@ async function submitAnswer() {
   document.getElementById('quiz-answer').disabled = true; document.getElementById('btn-submit').style.display = 'none'; document.getElementById('btn-next').style.display = 'block';
 
   if (!isGuest && auth.currentUser) {
-    db.collection('users').doc(auth.currentUser.uid).set({
-      currentRound: uCurrentRound, roundAnswers: uRoundAnswers, totalAnswers: uTotalAnswers, totalCorrect: uTotalCorrect, wordHistory: uWordHistory, lastActive: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const updates = {};
+    if (activeRange === 'extra') {
+      updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers;
+      updates.totalAnswers_extra = uTotalAnswers; updates.totalCorrect_extra = uTotalCorrect;
+      updates.wordHistory_extra = uWordHistory;
+    } else {
+      updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers;
+      updates.totalAnswers = uTotalAnswers; updates.totalCorrect = uTotalCorrect;
+      updates.wordHistory = uWordHistory;
+    }
+    updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
     
     const info = getActiveRangeInfo();
     const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / info.total) * 100);
     const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
     
-    db.collection('leaderboard').doc(auth.currentUser.uid).set({
+    // 🌟 ランキングも休み明け専用データベース「leaderboard_extra」へ隔離！
+    const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+    db.collection(lbCol).doc(auth.currentUser.uid).set({
       uid: auth.currentUser.uid, displayName: nameToSave, email: auth.currentUser.email, progressPercent: accumulatedProgress, currentRound: uCurrentRound,
       roundProgress: Math.floor((uRoundAnswers.length / info.total) * 100), accuracy: totalAccuracy, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
@@ -1628,7 +1688,12 @@ function finishQuizSession() {
       document.getElementById('result-title').textContent = `${uCurrentRound}周目 100% 達成！！🎉`;
       document.getElementById('result-sub').textContent = `全${info.total}語を一回ずつ解破しました！`;
       uCurrentRound++; uRoundAnswers = [];
-      if (!isGuest && auth.currentUser) db.collection('users').doc(auth.currentUser.uid).set({ currentRound: uCurrentRound, roundAnswers: uRoundAnswers }, { merge: true });
+      if (!isGuest && auth.currentUser) {
+        const updates = {};
+        if (activeRange === 'extra') { updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers; } 
+        else { updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers; }
+        db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
+      }
       showScreen('screen-result');
     } else { showScreen('screen-home'); refreshUI(); }
   }
@@ -1658,7 +1723,45 @@ function tickCountdown() {
   normaEl.innerHTML = `<div class="norma-badge">📚 今日の残りノルマ: ${norma}語 / 日 (範囲内未回答: ${remaining}語)</div>`;
 }
 
-// 🌟 管理者専用：クラス全員のテスト範囲を「休み明け」に一撃で変更する魔法のボタンを追加！
+// 🌟 ランキングの読み込み先も範囲に合わせて自動切り替え
+function updateLeaderboardDisplay() {
+  const homeLeaderboard = document.getElementById('home-leaderboard');
+  if (isGuest) { homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>"; return; }
+  const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+  db.collection(lbCol).orderBy('progressPercent', 'desc').limit(3).get().then(snapshot => {
+    if (snapshot.empty) { homeLeaderboard.innerHTML = "まだデータがありません。一番乗りを目指そう！"; return; }
+    let i = 0;
+    homeLeaderboard.innerHTML = snapshot.docs.map(doc => {
+      const e = doc.data(); const rankEmoji = i===0?'👑':i===1?'🥈':'🥉'; i++;
+      return `<div style="padding:6px; background:${i===1?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
+        <span>${rankEmoji} ${i}. <b>${e.displayName}</b></span><span><b style="color:#1976d2;">${e.currentRound}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
+      </div>`;
+    }).join('');
+  });
+}
+
+function openLeaderboardModal() {
+  document.getElementById('leaderboard-modal').classList.add('open'); const boardEl = document.getElementById('leaderboard-content-full'); boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
+  const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+  db.collection(lbCol).orderBy('progressPercent', 'desc').get().then(snapshot => {
+    if(snapshot.empty) { boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>"; return; } let i = 0;
+    boardEl.innerHTML = snapshot.docs.map(doc => {
+      const e = doc.data(); i++; return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-weight:bold;">${i}. ${e.displayName}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div><div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound}周目 ${e.roundProgress || 0}%</div></div></div>`;
+    }).join('');
+  });
+}
+
+async function saveNickname() {
+  const newName = document.getElementById('nickname-input').value.trim(); if (!newName) { alert("ニックネームを入力してください"); return; }
+  if (!isGuest && auth.currentUser) {
+    try { 
+      await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true }); currentNickname = newName; document.getElementById('user-info').textContent = `👤 ${newName}`; document.getElementById('nickname-modal').classList.remove('open'); 
+      const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+      db.collection(lbCol).doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true }); refreshUI(); 
+    } catch(e) {}
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const adminBtn = document.querySelector('button[onclick="openTestDateModal()"]');
   if (adminBtn) {
@@ -1667,14 +1770,11 @@ window.addEventListener('DOMContentLoaded', () => {
     btn.style = "margin-top:10px; padding:8px; background:#f57c00; color:white; border-radius:8px; border:none; width:100%; cursor:pointer; font-weight:bold;";
     btn.onclick = () => {
       const d = prompt("テストの日時を YYYY-MM-DDTHH:MM の形式で入力してください\\n(例: 2026-08-25T09:00)", "2026-08-25T09:00");
-      if(d) {
-        setAndSaveSharedTest("休み明けテスト", new Date(d).toISOString(), 'extra');
-      }
+      if(d) { setAndSaveSharedTest("休み明けテスト", new Date(d).toISOString(), 'extra'); }
     };
     adminBtn.parentNode.insertBefore(btn, adminBtn.nextSibling);
   }
 });
-
 </script>
 </body>
 </html>
