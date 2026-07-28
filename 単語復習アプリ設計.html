@@ -1145,56 +1145,67 @@ function tickCountdown() {
 // 🌟 GSAPを使った約3秒間の複雑＆超絶ポップな5段階イントロ
 // 🌟 Figma埋め込み版 イントロアニメーション
 // 🌟 Figmaプロトタイプ埋め込み版 イントロアニメーション
+// 🌟 邪魔なものを一切排除した、超滑らか＆シームレスなネイティブロゴアニメーション
 function playTangoEffect(callback) {
   const screen = document.getElementById('transition-screen');
   
-  // 画面を表示状態にリセット（背景をシンプルな色に上書き）
+  // 画面を表示（色はCSSのグラデーションが適用されます）
   screen.style.display = 'flex';
   screen.style.opacity = '1';
-  screen.style.background = '#f5f5f0'; 
   
-  // スマホでもPCでも綺麗に収まるように、iframeをレスポンシブの箱に入れて展開
+  // 純粋なロゴの文字だけを配置（iframeやボタンは完全撤去！）
   screen.innerHTML = `
-    <div style="width: 100%; max-width: 800px; padding: 20px; display: flex; flex-direction: column; align-items: center;">
-      <div style="position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.15);">
-        <iframe 
-          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
-          src="https://embed.figma.com/proto/TwSqgv8wfPKZEEdhD9fpjV/TANGO?timeline=keyframe&node-id=66-204&scaling=min-zoom&content-scaling=fixed&page-id=66%3A203&embed-host=share" 
-          allowfullscreen>
-        </iframe>
-      </div>
-      <p style="color: #888; font-size: 12px; margin-top: 12px;">※アニメーション読み込み中...</p>
-      <button id="skip-btn" style="margin-top: 16px; padding: 12px 32px; background: #2D7DD2; color: white; font-weight: bold; font-size: 16px; border: none; border-radius: 99px; cursor: pointer; box-shadow: 0 4px 12px rgba(45, 125, 210, 0.3); transition: 0.2s;">
-        クイズをスタート！🚀
-      </button>
+    <div id="tango-logo">
+      <span class="tango-char">t</span>
+      <span class="tango-char">a</span>
+      <span class="tango-char">n</span>
+      <span class="tango-char char-g">G</span>
+      <span class="tango-char char-o">O</span>
+      <span class="tango-char char-ex">!</span>
     </div>
   `;
 
-  let isFinished = false;
-  
-  // クイズ画面へ移行する処理
-  const finishIntro = () => {
-    if (isFinished) return;
-    isFinished = true;
-    
-    callback(); // 裏でクイズを描画
-    
-    // スーッとフェードアウト
-    screen.style.transition = "opacity 0.3s ease";
-    screen.style.opacity = '0';
-    setTimeout(() => { 
-      screen.style.display = 'none'; 
-      // 次回起動時のために中身を空にしておく
-      screen.innerHTML = ''; 
-    }, 300);
-  };
+  // GSAPのタイムラインで約3秒の滑らかなドラマを作る
+  const tl = gsap.timeline({
+    onComplete: () => {
+      callback(); // 裏でクイズ画面の準備を完了させる
+      // 最後に背景をスーッとフェードアウトさせてゲームへ！
+      gsap.to(screen, { 
+        opacity: 0, 
+        duration: 0.4, 
+        ease: "power2.inOut", 
+        onComplete: () => screen.style.display = 'none' 
+      });
+    }
+  });
 
-  // 「スタート」ボタンを押したら即座にクイズ開始
-  document.getElementById('skip-btn').onclick = finishIntro;
-
-  // アニメーションを堪能した約6秒後に自動でクイズへ進む
-  // （※Figmaのアニメーションの長さに合わせて「6000」の数字は自由に調整してください！）
-  setTimeout(finishIntro, 6000);
+  // 🎬 1. スーッと美しく浮かび上がる（FigmaのSmart Animateのような滑らかさ）
+  tl.fromTo(".tango-char", 
+    { y: 60, opacity: 0, scale: 0.8 }, 
+    { y: 0, opacity: 1, scale: 1, duration: 0.7, stagger: 0.05, ease: "back.out(1.2)" }
+  )
+  // 🎬 2. ふんわりと波打つようなモーション（心地よい浮遊感）
+  .to(".tango-char", 
+    { y: -12, duration: 0.4, yoyo: true, repeat: 1, stagger: 0.06, ease: "sine.inOut" },
+    "+=0.2" // 浮かび上がったあとの余韻
+  )
+  // 🎬 3. 「GO!」だけ少し強調してユーザーのテンションを上げる
+  .to(".char-g, .char-o, .char-ex",
+    { scale: 1.2, duration: 0.2, yoyo: true, repeat: 1, ease: "power2.out" },
+    "-=0.2" // 波打ちが終わる前にスッと差し込む
+  )
+  // 🎬 4. 画面手前に向かって、フワッと左右に広がりながら消え去る
+  .to(".tango-char", 
+    {
+      scale: 3, 
+      opacity: 0, 
+      x: (i) => (i - 2.5) * 80, // 左右に滑らかに広がる
+      duration: 0.6,
+      stagger: 0.03,
+      ease: "power3.in"
+    },
+    "+=0.3" // 最後に一瞬タメを作ってから消える
+  );
 }
 
 // 🔓 ログアウト・ゲストログイン
