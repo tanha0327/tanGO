@@ -169,13 +169,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </head>
 <body>
 
-<div class="login-screen" id="login-screen">
-  <div class="login-box">
-    <div style="font-size: 24px; font-weight: 700; margin-bottom: 1rem;">単語復習アプリ</div>
-    <div style="font-size: 28px; font-weight: 900; color: #2D7DD2; font-family: Impact; margin-bottom: 1.5rem;">tanGO!!</div>
-    <button class="big-btn" style="background:white; border:2px solid #ddd; color:#333;" onclick="loginWithGoogle()">🔐 Googleでログイン</button>
-    <button class="big-btn btn-primary" onclick="loginAsGuest()">👤 ゲストで使用</button>
+<!-- 🌟 モダンな2カラムログイン画面 -->
+<div id="login-screen" class="modern-login-screen">
+  <div class="login-left">
+    <div class="login-content">
+      <h1>Hello!</h1>
+      <p>Use your email or another service to continue with tanGO.</p>
+      
+      <!-- Googleログインボタン -->
+      <button class="modern-btn btn-social" onclick="loginWithGoogle()">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/></svg>
+        Continue with Google
+      </button>
+      
+      <!-- Appleログインボタン（※デザイン上のダミー） -->
+      <button class="modern-btn btn-social" onclick="alert('Appleログインは準備中です！')">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M16.365 1.43c0 0-2.08.358-3.832 2.213-1.7 1.802-1.748 3.83-1.748 3.83s2.057-.22 3.655-2.073c1.688-1.954 1.925-3.97 1.925-3.97zm2.348 7.37c-2.316 0-3.69 1.47-4.63 1.47-.923 0-2.02-1.258-3.89-1.258-2.28 0-4.394 1.348-5.567 3.42-2.36 4.185-.6 10.4 1.71 14.34 1.134 1.93 2.505 4.096 4.595 4.015 1.986-.084 2.76-1.293 5.15-1.293 2.375 0 3.085 1.293 5.17 1.253 2.146-.04 3.32-1.984 4.43-3.9 1.293-2.22 1.828-4.382 1.86-4.49-.043-.017-4.18-1.63-4.225-6.425-.035-4.004 3.25-5.91 3.407-6.006-1.89-2.77-4.82-3.14-5.83-3.21z"/></svg>
+        Continue with Apple
+      </button>
+      
+      <div class="login-divider">OR</div>
+      
+      <!-- ゲストログインボタン（Emailの代わりに配置） -->
+      <button class="modern-btn btn-blue" onclick="loginAsGuest()">
+        Continue as Guest
+      </button>
+      
+      <div class="login-legal">
+        By continuing, you agree to our Terms of Service. Read our Privacy Policy.
+      </div>
+    </div>
   </div>
+  
+  <!-- 右側のグラデーション画像エリア -->
+  <div class="login-right"></div>
 </div>
 
 <div id="app-container" style="display: none;">
@@ -337,290 +364,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
-// 単語データ
-const RAW = `1401	bake	(パンなど)を焼く，焼ける
-1402	boil	をわかす，ふっとうする，を煮る，煮える
-1403	melt	を溶かす，溶ける
-1404	feed	に食物・えさを与える／(家族など)を養う／えさ
-1405	flavor	風味，味／味わい，趣
-1406	forbid	を禁止する
-1407	prohibit	を禁止する
-1408	ban	を禁止する／禁止令
-1409	tool	道具
-1410	equipment	装備，設備，道具／知識，技術
-1411	instrument	器具，計器／楽器
-1412	switch	スイッチ／《+ on/offで》スイッチを入れる／切る／を交換する
-1413	furniture	《集合的に》家具
-1414	screen	(テレビやパソコンなどの)画面，(映画などの)スクリーン，ついたて
-1415	cell phone	携帯電話
-1416	beg	(を)請う，(を)頼む
-1417	remind	に思い出させる，に気づかせる
-1418	encourage	を励ます，を奨励する
-1419	relieve	を安心させる／を和らげる
-1420	fascinate	を魅了する，を魅惑する
-1421	force	に無理やり～させる／力／《通常(複)で》軍隊
-1422	confuse	を混乱させる，をまごつかせる／を混同する
-1423	competition	競争，試合
-1424	battle	戦闘，戦争／戦う
-1425	army	《the -》陸軍，軍隊
-1426	soldier	兵士
-1427	victory	勝利
-1428	victim	(事故などの)犠牲者，被害者
-1429	defeat	敗北，敗戦／を打ち負かす
-1430	tank	水槽，タンク／戦車
-1431	figure	(人・物の)姿／数字／図形／と思う／を計算する
-1432	square	正方形，四角／(四角い)広場／《数学で》平方，二乗／正方形の／平方の
-1433	circle	円／仲間，団体
-1434	level	水平な，平らな／水平(面)／水準
-1435	sheet	(紙などの)枚／《通常(複)で>シーツ
-1436	row	列，並び／(ボート)をこぐ
-1437	flow	流れる／流れ
-1438	float	浮かぶ，を浮かべる
-1439	pour	(液体)を注ぐ，流れ出る
-1440	splash	(水など)をはねかける，(水などが)飛び散る
-1441	expect	を予期する／を期待する／(～だろう)と思う
-1442	concern	を心配させる／に関係する／心配，関心事
-1443	hesitate	ためらう，ちゅうちょする
-1444	disappoint	を失望させる
-1445	regret	を後悔する
-1446	doubt	を疑う，～ではないだろうと思う／疑い
-1447	admire	に感心する，を賞賛する
-1448	pray	(を)祈る
-1449	rely	《+ on[upon]…》…をあてにする，…に頼る
-1450	resist	に抵抗する，をがまんする
-1451	refuse	(を)拒む，(を)断る
-1452	avoid	を避ける
-1453	particular	特定の，特別の／《be – about…で》…について(好みが)うるさい
-1454	participate	参加する
-1455	apartment	アパート(の室)／アパート(の建物全体)
-1456	department	(会社などの)部，学部，(デパートなどの)売場
-1457	consist	《+ of…》…から成る，…で構成される
-1458	remain	～のままである／残っている／《(複)で》残り，残ったもの
-1459	require	を必要とする／を要求する
-1460	adopt	を採用する／を養子にする
-1461	select	を選ぶ
-1462	limit	を限定する，を制限する／限界，制限／境界(線)
-1463	unite	を結合させる，結合する，を団結させる，団結する
-1464	connect	を接続する，をつなぐ
-1465	politics	政治，政治学
-1466	democracy	民主主義，民主政治
-1467	freedom	自由
-1468	election	選挙
-1469	official	公の，公式の／公務員，役人，職員
-1470	moral	道徳の，道徳的な／《(複)で》道徳
-1471	investigation	調査，捜査
-1472	data	資料，データ，情報
-1473	aspect	面，様相
-1474	factor	要因，要素
-1475	analyze	を分析する
-1476	focus	《+ on…》…に焦点を合わせる／焦点
-1477	concentrate	《+ (…) on ～》(…を)～に集中する
-1478	effect	影響，効果／結果
-1479	education	教育
-1480	experiment	実験／実験する
-1481	laboratory	研究室・研究所，実験室
-1482	principle	主義／原理，原則
-1483	theory	理論，学説
-1484	scholarship	奨学金
-1485	truly	本当に
-1486	fully	十分に
-1487	slightly	わずかに，少しだけ
-1488	simply	単に／簡単に
-1489	gradually	だんだんと，しだいに
-1490	entire	全体の／完全な
-1491	extreme	極度の／過酷な／過激な／極端(な状態)
-1492	likely	ありそうな
-1493	direction	方向，方角／指揮／《通常(複)で》指示
-1494	period	期間／《the -》時代／授業時間／終止符
-1495	sort	種類／を分類する
-1496	variety	変化(に富むこと)，多様性
-1497	grade	成績《米》／等級，程度／学年／に等級をつける
-1498	rate	率，割合／(サービスなどの)料金，相場
-1499	balance	つり合い，バランス／をつり合わせる，つり合う
-1500	ingredient	成分，要素，内容物／原料，材料
-1501	image	像，イメージ，映像
-1502	impression	印象，感銘
-1503	appearance	見かけ，外観／現れること
-1504	attitude	態度
-1505	possibility	可能性，実現性
-1506	absolutely	完全に，まったく／絶対的に
-1507	adult	成人，おとな／成人の
-1508	kid	子ども／(を)からかう
-1509	ancestor	先祖，祖先
-1510	crowd	群衆／(に)群がる
-1511	owner	所有者，持ち主
-1512	speaker	話す人，話者，演説者／スピーカー
-1513	captain	キャプテン／船長，機長
-1514	author	著者，作者
-1515	director	指導者，重役／(映画などの)監督／指揮者
-1516	immigrant	(外国からの)移民
-1517	talent	才能／才能ある人々
-1518	strict	(人が)厳しい／厳密な
-1519	severe	(人・規律が)厳しい／(天候が)厳しい／(痛みが)ひどい
-1520	cruel	残酷な
-1521	position	位置，場所／地位／立場
-1522	spot	場所，地点／はん点，しみ
-1523	suburb	《the -》郊外／《a -》郊外の一地区
-1524	region	地方，地域／領域／(体などの)部分
-1525	base	土台／基地／の基礎を置く
-1526	locate	(…の)場所・位置を示す／《be -ed in…で》…に位置する
-1527	upstairs	階上へ，2階へ
-1528	downtown	繁華街・商業地区へ(で)／繁華街・商業地区の／(都市の)中心街，商業地区
-1529	frame	骨組み／(窓などの)わく
-1530	edge	ふち，端／(刃物の)刃
-1531	surface	表面／表面の
-1532	section	区域，部分／(新聞などの)欄
-1533	elsewhere	どこかほかのところで
-1534	everywhere	どこでも，いたるところに／どこで…しても
-1535	command	(に)命令する／(言語)を自由にあやつる／命令，(軍の)指揮／(言語を)自由にあやつる力
-1536	obey	(に)従う
-1537	gun	銃
-1538	weapon	武器
-1539	crime	罪，犯罪
-1540	poison	毒，毒薬／を毒する，を害する
-1541	alarm	警報(器)，目覚まし時計／驚き，恐怖／に警報を発する
-1542	shock	衝撃的なこと，(精神的な)ショック／に衝撃・ショックを与える
-1543	thief	どろぼう，空き巣
-1544	harm	害，損害／に害を与える
-1545	risk	(自ら冒す)危険
-1546	steal	(こっそりと)(を)盗む
-1547	rob	を奪う，を強奪する
-1548	assure	を保証する
-1549	explode	爆発する，を爆発させる
-1550	pollute	を汚染する
-1551	ruin	を台なしにする，を破壊する／破滅／《通常(複)で》廃墟
-1552	crash	(自動車が)衝突する，(飛行機が)墜落する／(激しい音を立てて)壊れる／衝突，墜落
-1553	arrest	逮捕する／逮捕
-1554	grab	をつかむ，をつかみ取る／つかむこと
-1555	traffic	交通(量)
-1556	transportation	輸送(機関)，交通機関
-1557	avenue	大通り
-1558	path	小道，細道
-1559	license	免許(証)，許可
-1560	signal	信号(機)，合図／(に)信号を送る，(に)合図する
-1561	fuel	燃料
-1562	baggage	(旅行の)手荷物《米》
-1563	advise	(に)忠告する，(に)助言する
-1564	suggest	を提案する／をそれとなく言う
-1565	recommend	を推薦する，を勧める
-1566	reply	返事をする，答える／返事，答え
-1567	describe	を描写する，の特徴を述べる
-1568	announce	を発表する，を知らせる
-1569	publish	(を)出版する
-1570	debate	討論，議論／を討論する，議論する
-1571	statement	声明(書)
-1572	association	協会，連合，連想
-1573	committee	委員会，(全)委員
-1574	independence	独立，自立
-1575	duty	義務／職務／関税
-1576	structure	構造(物)／構成
-1577	the day before yesterday	おととい
-1578	the day after tomorrow	あさって
-1579	the other day	先日，このあいだ
-1580	these days	このごろ(は)
-1581	in those days	当時は，そのころは
-1582	at that time	そのころは，当時は
-1583	each time	……するたびに
-1584	all the time	いつも／そのあいだずっと
-1585	day after day	毎日毎日
-1586	day by day	日ごとに
-1587	every other day	日おきに
-1588	over and over again	何度も何度も
-1589	as usual	いつものように
-1590	by chance	偶然に
-1591	pull out (～)	(～)を引き抜く／(列車・船などが)出発する
-1592	point out ～	～を指摘する
-1593	wear out (～)	(～)をすり減らす，すり減る，を使い古す，使い古される／(人)を疲れさせる
-1594	see off ～	～を見送る
-1595	pay[give] attention to	……に注意を払う
-1596	pay[make] a visit to	…(場所)を訪れる，(人)を訪問する
-1597	in front of	……の前に，…の正面に
-1598	in back of	……の後ろに
-1599	in the middle of	……の真ん中に，…の中央に，…の最中に
-1600	at the top of	……の頂上に，…の(一番)上に
-1601	at the bottom of	……の底に，…の(一番)下に
-1602	next to	……のとなりに／《順番・程度などが》…の次に
-1603	across from	……の向かいに
-1604	out of	……の中から，…から外に／…の範囲を越えて／…がなくなって
-1605	as … as one can /as … as possible	できるだけ…
-1606	… as well	同様に…，…もまた
-1607	the same … as	～～と同じ…
-1608	…(,) such as ～	(たとえば)～のような…
-1609	such … as to do	～するような…
-1610	be about to do	(まさに)～しようとしている，～するところである
-1611	in order to do	～するために
-1612	too … to do	～するには…すぎる，あまりに…なので～できない
-1613	… enough to do	～するのに十分…，とても…なので～する
-1614	go along[down]	……をまっすぐ行く
-1615	catch up (with …)	(…に)追いつく
-1616	feel sorry for	……のことを気の毒に思う
-1617	remind 〈人〉 of …	に…を思い出させる
-1618	owe … to ～	…は～のおかげである，～に…のことで恩を受けている／～に…(金など)を借りている
-1619	no longer	もはや…でない，もはや…しない
-1620	not … at all	少しも…ない，全然…ない
-1621	not always …	いつも…とは限らない，必ずしも…とは限らない
-1622	anything but …	《do – but…}…以外なら何でもする／決して…ではない
-1623	nothing but …	ただ…だけ，…にすぎない／《do – but…》…してばかりいる
-1624	far from	……からはほど遠い，少しも…でない
-1625	by no means …	決して…ない，まったく…ない
-1626	get rid of	……を取り除く，…を駆除する
-1627	look into	……を調査する，…を研究する
-1628	pick up ～	～を拾いあげる／(車で)を迎える，を迎えに行く
-1629	set up ～	～を立てる，を設置する
-1630	take up ～	～(趣味など)を始める
-1631	turn up	現れる，見つかる
-1632	take … for granted	…を当然のことと思う
-1633	powerful	強力な，力強い
-1634	capable	有能な／《be – of …[～ing]》…できる
-1635	clever	りこうな
-1636	wealthy	裕福な
-1637	positive	積極的な／確実な／肯定的な／陽性の
-1638	efficient	有能な，能率的な
-1639	suitable	適した，ふさわしい
-1640	essential	不可欠の，本質的な／不可欠のもの
-1641	pure	純粋な，清らかな
-1642	skillful	熟練した，じょうずな
-1643	superior	優れている，上位の
-1644	concept	概念
-1645	process	過程，製法
-1646	definition	定義，語義
-1647	research	(を)研究する，(を)調査する／研究，調査
-1648	observe	(を)観察する
-1649	measure	(を)測る／寸法／(ものさしなどの)測定器具
-1650	estimate	(を)見積もる／を評価する／見積もり(額)／評価
-1651	memorize	を記憶する，を暗記する
-1652	refer	《+ to …》…に言及する／…を参照する
-1653	arrange	を整える，を並べる／(を)取り決める，(を)手配する
-1654	adjust	を調節する，を調整する，を適合させる
-1655	imitate	をまねる，模倣する／を見習う
-1656	explore	を探検する
-1657	translate	(を)翻訳する
-1658	comprehend	を理解する／を包む
-1659	consult	(専門家)に相談する，に意見を求める／(辞書・地図など)を調べる
-1660	manage	を管理する，を経営する／《+ to do》なんとか…する
-1661	rough	(表面が)でこぼこした，ざらざらした／荒っぽい／おおよその
-1662	flat	平らな，平たい，(時間が)きっかり／アパート(の室)《英》
-1663	smooth	(表面・動作が)なめらかな
-1664	broad	(幅が)広い，広々した
-1665	narrow	(幅が)狭い，細い
-1666	specific	明確な，特定の，具体的な／仕様(書)，明細(書)
-1667	fortunately	幸運にも
-1668	frankly	率率に
-1669	anyway	とにかく，いずれにせよ
-1670	therefore	それゆえに，それで
-1671	eventually	最後には，ついに
-1672	furthermore	さらに，その上
-1673	moreover	その上，さらに
-1674	thus	したがって，それゆえ／このように
-1675	survey	調査／ざっと見渡すこと／を調査する／をざっと見渡す
-1676	object	物体／対象(物)／目的／《+ to … 》…に反対する
-1677	mission	使命，任務／使節団／伝道，布教
-1678	frequency	しばしば起こること，頻発／頻度
-1679	average	平均，標準／平均の，普通の
-1680	standard	基準，標準，水準／標準の，標準的な
-1681	relation	関係，関連
-1682	combination	組み合わせ，結合
-1683	evidence	証拠`;
 
 // ☁️ データベース（Firestore）から単語を取得＆自動登録
 async function initDictionary() {
