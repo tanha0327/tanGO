@@ -464,9 +464,17 @@ function loginAsGuest() {
 // 🔐 Googleログイン機能（大復活！）
 function loginWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).then(() => {
-    window.location.reload();
-  }).catch((error) => {
-    alert("ログインエラー: " + error.message);
-  });
+  firebase.auth().signInWithPopup(provider)
+    .then((result) => {
+      // 成功時の処理...
+    })
+    .catch((error) => {
+      // 🌟 ここを追加！：ポップアップ重複エラーの場合はアラートを消して無視する
+      if (error.code === 'auth/cancelled-popup-request') {
+        return; 
+      }
+      
+      // それ以外の本当のエラーの時だけアラートを出す
+      alert("ログインエラー: " + error.message);
+    });
 }

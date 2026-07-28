@@ -189,19 +189,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* 右側のグラデーションエリア（スマホでは非表示にしてスッキリさせる） */
 .login-right {
   flex: 1;
-  /* 画像の代わりにCSSでメッシュグラデーションを再現 */
-  background: radial-gradient(circle at 10% 10%, #ffdf9e 0%, transparent 40%),
-              radial-gradient(circle at 80% 20%, #7fe2f2 0%, transparent 40%),
-              radial-gradient(circle at 90% 80%, #f65ce0 0%, transparent 40%),
-              radial-gradient(circle at 10% 90%, #d8c3ff 0%, transparent 40%),
-              radial-gradient(circle at 50% 50%, #c8f5b4 0%, transparent 50%),
-              #fdfbfb;
-  background-size: cover;
-  background-position: center;
-  /* 自分でFigmaで作った画像を当てはめる場合は、上の background を消して以下を使います */
-  /* background: url('bg-gradient.jpg') center/cover no-repeat; */
+  /* 自分がFigmaから書き出した画像ファイル名を入れる！ */
+  background: url('login-right.png') center/cover no-repeat;
 }
-
 /* スマホのような細い画面では右側のグラデーションを消す */
 @media (max-width: 768px) {
   .login-right { display: none; }
