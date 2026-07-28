@@ -1545,6 +1545,36 @@ window.addEventListener('DOMContentLoaded', () => {
     adminBtn.parentNode.insertBefore(btn, adminBtn.nextSibling);
   }
 });
+
+// ==========================================
+// 🌟 バージョン管理＆強制リロード機能
+// ==========================================
+
+// 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
+const APP_VERSION = "v2.1 (新型Lottieロゴ版)"; 
+
+window.addEventListener('DOMContentLoaded', () => {
+  const homeScreen = document.getElementById('screen-home');
+  if (homeScreen) {
+    const versionDiv = document.createElement('div');
+    versionDiv.style = "text-align: center; margin-top: 30px; padding-bottom: 20px; font-size: 12px; color: #888;";
+    versionDiv.innerHTML = `
+      現在のバージョン: <b style="color: #2D7DD2;">${APP_VERSION}</b><br>
+      <button onclick="forceReload()" style="margin-top: 10px; padding: 8px 16px; font-size: 12px; background: white; color: #555; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: 0.2s;">
+        🔄 最新データを読み込む (キャッシュクリア)
+      </button>
+    `;
+    homeScreen.appendChild(versionDiv);
+  }
+});
+
+// キャッシュを無視して強制的に最新ファイルを引っ張ってくる魔法の関数
+function forceReload() {
+  const btn = document.querySelector('button[onclick="forceReload()"]');
+  if(btn) btn.textContent = "⏳ 読み込み中...";
+  // URLの末尾に現在の「ミリ秒」をくっつけることで、ブラウザに「別の新しいサイトだ」と錯覚させて最新ファイルを強制ダウンロードさせます
+  window.location.href = window.location.pathname + '?v=' + new Date().getTime();
+}
 </script>
 </body>
 </html>
