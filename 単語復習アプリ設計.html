@@ -1143,66 +1143,58 @@ function tickCountdown() {
 // 🌟 GSAPを使った超ド派手な弾けるイントロ (GSAP Style)
 // 🌟 Motion (v12) を使った約3秒間の複雑＆超絶ポップなイントロ
 // 🌟 GSAPを使った約3秒間の複雑＆超絶ポップな5段階イントロ
+// 🌟 Figma埋め込み版 イントロアニメーション
+// 🌟 Figmaプロトタイプ埋め込み版 イントロアニメーション
 function playTangoEffect(callback) {
   const screen = document.getElementById('transition-screen');
   
-  // 画面を表示状態にリセット
+  // 画面を表示状態にリセット（背景をシンプルな色に上書き）
   screen.style.display = 'flex';
   screen.style.opacity = '1';
+  screen.style.background = '#f5f5f0'; 
   
-  // 文字を組み立てる
+  // スマホでもPCでも綺麗に収まるように、iframeをレスポンシブの箱に入れて展開
   screen.innerHTML = `
-    <div id="tango-logo">
-      <span class="tango-char">t</span>
-      <span class="tango-char">a</span>
-      <span class="tango-char">n</span>
-      <span class="tango-char char-g">G</span>
-      <span class="tango-char char-o">O</span>
-      <span class="tango-char char-ex">!</span>
+    <div style="width: 100%; max-width: 800px; padding: 20px; display: flex; flex-direction: column; align-items: center;">
+      <div style="position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.15);">
+        <iframe 
+          style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;" 
+          src="https://embed.figma.com/proto/TwSqgv8wfPKZEEdhD9fpjV/TANGO?timeline=keyframe&node-id=66-204&scaling=min-zoom&content-scaling=fixed&page-id=66%3A203&embed-host=share" 
+          allowfullscreen>
+        </iframe>
+      </div>
+      <p style="color: #888; font-size: 12px; margin-top: 12px;">※アニメーション読み込み中...</p>
+      <button id="skip-btn" style="margin-top: 16px; padding: 12px 32px; background: #2D7DD2; color: white; font-weight: bold; font-size: 16px; border: none; border-radius: 99px; cursor: pointer; box-shadow: 0 4px 12px rgba(45, 125, 210, 0.3); transition: 0.2s;">
+        クイズをスタート！🚀
+      </button>
     </div>
   `;
 
-  // タイムラインを作成（終わったら画面を消してクイズ開始！）
-  const tl = gsap.timeline({
-    onComplete: () => {
-      callback(); // クイズ画面を裏で描画
-      // 最後にイエローの背景をスーッとフェードアウト
-      gsap.to(screen, { opacity: 0, duration: 0.3, onComplete: () => screen.style.display = 'none' });
-    }
-  });
+  let isFinished = false;
+  
+  // クイズ画面へ移行する処理
+  const finishIntro = () => {
+    if (isFinished) return;
+    isFinished = true;
+    
+    callback(); // 裏でクイズを描画
+    
+    // スーッとフェードアウト
+    screen.style.transition = "opacity 0.3s ease";
+    screen.style.opacity = '0';
+    setTimeout(() => { 
+      screen.style.display = 'none'; 
+      // 次回起動時のために中身を空にしておく
+      screen.innerHTML = ''; 
+    }, 300);
+  };
 
-  // 🎬 【第1段階】上空からバネのように超バウンド落下
-  tl.fromTo(".tango-char", 
-    { y: -600, scale: 0.3, rotation: -90, opacity: 0 }, 
-    { y: 0, scale: 1, rotation: 0, opacity: 1, duration: 0.8, stagger: 0.08, ease: "back.out(2)" }
-  )
-  // 🎬 【第2段階】波打つウェーブアクション
-  .to(".tango-char", 
-    { y: -30, duration: 0.2, yoyo: true, repeat: 1, stagger: 0.05, ease: "power1.inOut" },
-    "+=0.1" // 落下の余韻を少し待ってから
-  )
-  // 🎬 【第3段階】「GO!」の心臓ドクン！
-  .to(".char-g, .char-o, .char-ex", 
-    { scale: 1.5, rotation: "random(-15, 15)", duration: 0.25, yoyo: true, repeat: 1, ease: "power2.out" },
-    "-=0.2" // ウェーブが終わる前に「食い気味」でスタート！
-  )
-  // 🎬 【第4段階】大爆発の前の「タメ」（全体がグッと潰れる）
-  .to(".tango-char", 
-    { scaleX: 1.3, scaleY: 0.7, y: 20, duration: 0.2, ease: "power2.out" },
-    "+=0.1"
-  )
-  // 🎬 【第5段階】カメラに向かって大爆発！！
-  .to(".tango-char", 
-    {
-      scale: 6,            // 画面に迫ってくる
-      opacity: 0,          // 迫りながら消える
-      x: (index) => (index - 2.5) * 200, // 左右に強烈に散らす衝撃波！
-      y: () => gsap.utils.random(-300, 300), 
-      duration: 0.5,
-      ease: "power4.in",
-      stagger: { amount: 0.1, from: "center" } // 真ん中の文字から順に弾け飛ぶ
-    }
-  );
+  // 「スタート」ボタンを押したら即座にクイズ開始
+  document.getElementById('skip-btn').onclick = finishIntro;
+
+  // アニメーションを堪能した約6秒後に自動でクイズへ進む
+  // （※Figmaのアニメーションの長さに合わせて「6000」の数字は自由に調整してください！）
+  setTimeout(finishIntro, 6000);
 }
 
 // 🔓 ログアウト・ゲストログイン
