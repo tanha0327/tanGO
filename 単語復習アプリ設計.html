@@ -1398,15 +1398,29 @@ function forceReload() {
 // 🌟 ページが読み込まれた時にLINEブラウザかどうかをチェック
 document.addEventListener("DOMContentLoaded", () => {
   const ua = navigator.userAgent || navigator.vendor || window.opera;
-  
-  // もしユーザーの環境が「LINE」だったら
-  if (ua.indexOf("Line") > -1) {
-    // いつものログイン画面を強制的に隠す
-    const loginScreen = document.getElementById('login-screen');
+  const isLine = ua.indexOf("Line") > -1;
+
+  // 要素を取得
+  const lineWarningScreen = document.getElementById('line-warning-screen');
+  const loginScreen = document.getElementById('login-screen');
+  const mainAppScreens = document.querySelectorAll('.screen'); // アプリ内の各画面
+
+  if (isLine) {
+    // 【パターンA：LINEの中の場合】
+    // 1. LINE警告画面だけを表示する
+    if (lineWarningScreen) lineWarningScreen.style.display = 'flex';
+    // 2. ログイン画面は絶対に見せない
     if (loginScreen) loginScreen.style.display = 'none';
-    
-    // 代わりにLINE警告画面をドーンと出す
-    document.getElementById('line-warning-screen').style.display = 'flex';
+    // 3. メインアプリも隠す
+    mainAppScreens.forEach(s => s.classList.remove('visible'));
+
+  } else {
+    // 【パターンB：通常のブラウザ（Safari/Chrome）の場合】
+    // 1. LINE警告画面は絶対に隠す
+    if (lineWarningScreen) lineWarningScreen.style.display = 'none';
+
+    // 2. ここで「すでにログイン済みか？」をFirebase等でチェックする処理が入るはずです
+    // 例：ログインしていなければ loginScreen を表示し、ログインしていれば mainApp を表示
   }
 });
 
