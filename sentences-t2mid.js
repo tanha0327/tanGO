@@ -736,8 +736,8 @@ window.SENTENCES_T2MID = [
  {
   "id": 1806,
   "en": "emerged",
-  "sentence": "A city ( ____ ) in the desert.\u000b1",
-  "sentenceJp": "つの都市が砂漠の中に現れた。"
+  "sentence": "A city ( ____ ) in the desert.",
+  "sentenceJp": "一つの都市が砂漠の中に現れた。"
  },
  {
   "id": 1807,
