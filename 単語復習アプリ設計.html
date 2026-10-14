@@ -55,6 +55,68 @@ const state = { queue: [], current: 0, results: [] };
 function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : '')); }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
 
+function getLeaderboardRangeKey() {
+  return ['midterm', 'final', 'extra', 't2mid'].includes(activeRange) ? activeRange : 'final';
+}
+function getLeaderboardFieldNames() {
+  const prefix = getLeaderboardRangeKey();
+  return {
+    progress: prefix + 'ProgressPercent',
+    round: prefix + 'CurrentRound',
+    roundProgress: prefix + 'RoundProgress',
+    accuracy: prefix + 'Accuracy'
+  };
+}
+function buildLeaderboardData(user, displayName) {
+  const info = getActiveRangeInfo();
+  const fields = getLeaderboardFieldNames();
+  const roundProgress = Math.floor(uRoundAnswers.length / Math.max(1, info.total) * 100);
+  const progressPercent = (uCurrentRound - 1) * 100 + (uRoundAnswers.length / Math.max(1, info.total)) * 100;
+  const accuracy = uTotalAnswers > 0 ? Math.round(uTotalCorrect / uTotalAnswers * 100) : 0;
+  const name = displayName || currentNickname || user.displayName || '名無し';
+  const data = {
+    uid: user.uid,
+    displayName: name,
+    email: user.email || '',
+    [fields.progress]: progressPercent,
+    [fields.round]: uCurrentRound,
+    [fields.roundProgress]: roundProgress,
+    [fields.accuracy]: accuracy,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  // 旧ランキング表示との互換性を維持（一学期期末のみ）
+  if (getLeaderboardRangeKey() === 'final') {
+    data.progressPercent = progressPercent;
+    data.currentRound = uCurrentRound;
+    data.roundProgress = roundProgress;
+    data.accuracy = accuracy;
+  }
+  return data;
+}
+function invalidateLeaderboardCache() {
+  window.__tangoLeaderboardCache = {};
+  ['home-leaderboard', 'leaderboard-content-full'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) delete el.dataset.loadedAt;
+  });
+}
+function getSortedLeaderboardRows(snapshot) {
+  const key = getLeaderboardRangeKey();
+  const fields = getLeaderboardFieldNames();
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    const progress = data[fields.progress] != null ? data[fields.progress] : (key === 'final' ? data.progressPercent : null);
+    if (progress == null || !Number.isFinite(Number(progress))) return null;
+    return {
+      ...data,
+      _rankProgressPercent: Number(progress),
+      _rankCurrentRound: data[fields.round] != null ? data[fields.round] : (key === 'final' ? (data.currentRound || 1) : 1),
+      _rankRoundProgress: data[fields.roundProgress] != null ? data[fields.roundProgress] : (key === 'final' ? (data.roundProgress || 0) : 0),
+      _rankAccuracy: data[fields.accuracy] != null ? data[fields.accuracy] : (key === 'final' ? (data.accuracy || 0) : 0)
+    };
+  }).filter(Boolean).sort((a, b) => b._rankProgressPercent - a._rankProgressPercent).slice(0, 10);
+}
+
 // 文章題データは起動を止めないよう、必要時に非同期で読み込む
 function loadT2MidSentenceData(timeoutMs = 4000) {
   if (Array.isArray(window.SENTENCES_T2MID) && window.SENTENCES_T2MID.length) return Promise.resolve(true);
@@ -1163,20 +1225,13 @@ async function exitQuizDirect() {
       updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
       await withSaveTimeout(db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true }));
 
-      const info = getActiveRangeInfo();
-      const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / Math.max(1, info.total)) * 100);
-      const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
-      const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
-      await withSaveTimeout(db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
-        uid: auth.currentUser.uid,
-        displayName: nameToSave,
-        email: auth.currentUser.email,
-        progressPercent: accumulatedProgress,
-        currentRound: uCurrentRound,
-        roundProgress: Math.floor((uRoundAnswers.length / Math.max(1, info.total)) * 100),
-        accuracy: totalAccuracy,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true }));
+      await withSaveTimeout(
+        db.collection('leaderboard').doc(auth.currentUser.uid).set(
+          buildLeaderboardData(auth.currentUser),
+          { merge: true }
+        )
+      );
+      invalidateLeaderboardCache();
     }
     document.getElementById('exit-modal').classList.remove('open');
     showScreen('screen-home');
@@ -1718,20 +1773,11 @@ async function submitAnswer(timedOut = false) {
     db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
       .catch(e => console.error('データ即時保存エラー:', e));
 
-    const info = getActiveRangeInfo();
-    const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / Math.max(1, info.total)) * 100);
-    const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
-    const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
-    db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
-      uid: auth.currentUser.uid,
-      displayName: nameToSave,
-      email: auth.currentUser.email,
-      progressPercent: accumulatedProgress,
-      currentRound: uCurrentRound,
-      roundProgress: Math.floor((uRoundAnswers.length / Math.max(1, info.total)) * 100),
-      accuracy: totalAccuracy,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(e => console.error('ランキング同期エラー:', e));
+    db.collection('leaderboard').doc(auth.currentUser.uid).set(
+      buildLeaderboardData(auth.currentUser),
+      { merge: true }
+    ).then(() => invalidateLeaderboardCache())
+     .catch(e => console.error('ランキング同期エラー:', e));
   }
 }
 
@@ -1880,9 +1926,9 @@ function updateLeaderboardDisplay(forceRefresh = false) {
   }
   const now = Date.now();
   if (!forceRefresh && homeLeaderboard.dataset.loadedAt && now - Number(homeLeaderboard.dataset.loadedAt) < 60000) return;
-
   homeLeaderboard.innerHTML = "<span style='color:#888;'>🏆 ランキングを読み込んでいます…</span>";
-  const rangeKey = rangeSuffix() || '_default';
+
+  const rangeKey = getLeaderboardRangeKey();
   const cache = window.__tangoLeaderboardCache || (window.__tangoLeaderboardCache = {});
   const render = rows => {
     if (!rows.length) {
@@ -1892,23 +1938,22 @@ function updateLeaderboardDisplay(forceRefresh = false) {
         const rankEmoji = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
         return `<div style="padding:6px; background:${index===0?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
           <span>${rankEmoji} ${index + 1}. <b>${escapeLeaderboardText(e.displayName || '名無し')}</b></span>
-          <span><b style="color:#1976d2;">${e.currentRound || 1}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
+          <span><b style="color:#1976d2;">${e._rankCurrentRound || 1}周目 ${e._rankRoundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e._rankAccuracy || 0}%)</span></span>
         </div>`;
       }).join('');
     }
     homeLeaderboard.dataset.loadedAt = String(Date.now());
   };
-  const useRows = rows => render(rows);
   const cached = cache[rangeKey];
   if (!forceRefresh && cached && cached.rows && Date.now() - cached.at < 60000) {
-    useRows(cached.rows);
+    render(cached.rows);
     return;
   }
   const request = cached && cached.promise && !forceRefresh
     ? cached.promise
-    : db.collection('leaderboard' + rangeSuffix()).orderBy('progressPercent', 'desc').limit(10).get()
+    : db.collection('leaderboard').get()
         .then(snapshot => {
-          const rows = snapshot.docs.map(doc => doc.data());
+          const rows = getSortedLeaderboardRows(snapshot);
           cache[rangeKey] = { rows, at: Date.now() };
           return rows;
         });
@@ -1920,7 +1965,7 @@ function updateLeaderboardDisplay(forceRefresh = false) {
   request.then(rows => {
     settled = true;
     clearTimeout(timeout);
-    useRows(rows);
+    render(rows);
   }).catch(e => {
     settled = true;
     clearTimeout(timeout);
@@ -1939,7 +1984,7 @@ function openLeaderboardModal(forceRefresh = false) {
     boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>ランキングを見るにはログインが必要です</div>";
     return;
   }
-  const rangeKey = rangeSuffix() || '_default';
+  const rangeKey = getLeaderboardRangeKey();
   const cache = window.__tangoLeaderboardCache || (window.__tangoLeaderboardCache = {});
   const cached = cache[rangeKey];
   const render = rows => {
@@ -1947,8 +1992,8 @@ function openLeaderboardModal(forceRefresh = false) {
       boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>";
     } else {
       boardEl.innerHTML = rows.map((e, index) => `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-        <div><div style="font-weight:bold;">${index + 1}. ${escapeLeaderboardText(e.displayName || '名無し')}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div>
-        <div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound || 1}周目 ${e.roundProgress || 0}%</div></div>
+        <div><div style="font-weight:bold;">${index + 1}. ${escapeLeaderboardText(e.displayName || '名無し')}</div><div style="font-size:11px; color:#888;">正解率: ${e._rankAccuracy || 0}%</div></div>
+        <div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e._rankCurrentRound || 1}周目 ${e._rankRoundProgress || 0}%</div></div>
       </div>`).join('');
     }
     boardEl.dataset.loadedAt = String(Date.now());
@@ -1960,9 +2005,9 @@ function openLeaderboardModal(forceRefresh = false) {
   boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
   const request = cached && cached.promise && !forceRefresh
     ? cached.promise
-    : db.collection('leaderboard' + rangeSuffix()).orderBy('progressPercent', 'desc').limit(10).get()
+    : db.collection('leaderboard').get()
         .then(snapshot => {
-          const rows = snapshot.docs.map(doc => doc.data());
+          const rows = getSortedLeaderboardRows(snapshot);
           cache[rangeKey] = { rows, at: Date.now() };
           return rows;
         });
@@ -1999,9 +2044,7 @@ async function saveNickname() {
 
   const saveButton = document.querySelector('button[onclick="saveNickname()"]');
   if (saveButton) { saveButton.disabled = true; saveButton.textContent = '保存中…'; }
-
   try {
-    // アカウントのニックネームを先に保存する
     await db.collection('users').doc(user.uid).set({ nickname: newName }, { merge: true });
     currentNickname = newName;
     const userInfo = document.getElementById('user-info');
@@ -2009,51 +2052,15 @@ async function saveNickname() {
     const nicknameModal = document.getElementById('nickname-modal');
     if (nicknameModal) nicknameModal.classList.remove('open');
 
-    // ランキングは範囲ごとに別コレクションなので、既存の本人レコードも同期する
-    const currentLeaderboard = 'leaderboard' + rangeSuffix();
-    const leaderboardCollections = [...new Set([
-      'leaderboard',
-      'leaderboard_t2mid',
-      'leaderboard_extra',
-      'leaderboard_midterm',
-      currentLeaderboard
-    ])];
-    const failures = [];
-
-    await Promise.all(leaderboardCollections.map(async collectionName => {
-      const ref = db.collection(collectionName).doc(user.uid);
-      try {
-        const snapshot = await ref.get();
-        if (snapshot.exists) {
-          await ref.set({ displayName: newName }, { merge: true });
-        } else if (collectionName === currentLeaderboard) {
-          const info = getActiveRangeInfo();
-          const progressPercent = (uCurrentRound - 1) * 100 +
-            (uRoundAnswers.length / Math.max(1, info.total)) * 100;
-          const accuracy = uTotalAnswers > 0 ? Math.round(uTotalCorrect / uTotalAnswers * 100) : 0;
-          await ref.set({
-            uid: user.uid,
-            displayName: newName,
-            email: user.email || '',
-            progressPercent,
-            currentRound: uCurrentRound,
-            roundProgress: Math.floor(uRoundAnswers.length / Math.max(1, info.total) * 100),
-            accuracy,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }, { merge: true });
-        }
-      } catch (error) {
-        failures.push(collectionName);
-        console.error('ランキング名の同期に失敗 (' + collectionName + '):', error);
-      }
-    }));
-
-    refreshUI();
-    if (failures.length) {
-      alert('アカウントのニックネームは保存しましたが、一部ランキングの名前を更新できませんでした：' +
-        failures.join('、') + '。Firestoreのルールを確認してください。');
-    } else {
-      alert('ニックネームを保存しました！');
+    try {
+      await db.collection('leaderboard').doc(user.uid).set(buildLeaderboardData(user, newName), { merge: true });
+      invalidateLeaderboardCache();
+      refreshUI();
+      updateLeaderboardDisplay(true);
+      alert('ニックネームとランキング表示名を保存しました！');
+    } catch (boardError) {
+      console.error('ランキング表示名の保存エラー:', boardError);
+      alert('アカウントのニックネームは保存しましたが、ランキングへの書き込みに失敗しました。Firestoreのルールを確認してください。');
     }
   } catch (error) {
     console.error('ニックネーム保存エラー:', error);
@@ -2096,7 +2103,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.9 (ニックネーム同期修正)"; 
+const APP_VERSION = "v3.0 (単一ランキングDB・範囲別フィールド)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
