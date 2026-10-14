@@ -836,15 +836,20 @@ function startTangoAuthListener() {
             uTotalAnswers = data['totalAnswers' + sfx] || 0;
             uTotalCorrect = data['totalCorrect' + sfx] || 0;
             uWordHistory = data['wordHistory' + sfx] || {};
+            const progressField = 'difficultyProgress' + sfx;
+            if (data[progressField]) { uDifficultyProgress = normalizeDifficultyProgress(data[progressField]); hasCloudDifficultyProgress = true; }
           } else {
             if (data.currentRound !== undefined) uCurrentRound = data.currentRound;
             if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers;
             if (data.totalAnswers !== undefined) uTotalAnswers = data.totalAnswers;
             if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect;
             if (data.wordHistory !== undefined) uWordHistory = data.wordHistory;
+            if (data.difficultyProgress) { uDifficultyProgress = normalizeDifficultyProgress(data.difficultyProgress); hasCloudDifficultyProgress = true; }
           }
         })
       ]);
+
+      initializeDifficultyProgress();
 
       // 選択中の範囲に固有のテスト日があれば共通設定より優先
       const rangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
@@ -1710,6 +1715,10 @@ function refreshUI() {
 }
 
 let randomDifficulty = 'standard';
+let isDifficultyRandomMode = false;
+let uDifficultyProgress = null;
+let hasCloudDifficultyProgress = false;
+const RANDOM_DIFFICULTY_LEVELS = ['easy', 'standard', 'hard'];
 const ADMIN_EMAIL = 'hanta0327@gmail.com';
 let wordDifficultyMap = {};
 let wordAdminFiltered = 'unclassified';
@@ -1755,26 +1764,120 @@ function getWordAdminRangeInfo(rangeKey) {
   return { lo: 0, hi: -1, label: '' };
 }
 
-function getRandomDifficultyWords(rangeWords) {
-  return rangeWords.filter(w => getWordDifficulty(w, activeRange) === randomDifficulty);
+function emptyDifficultyProgress() {
+  return { easy: { round: 1, answered: [] }, standard: { round: 1, answered: [] }, hard: { round: 1, answered: [] } };
 }
-
+function normalizeDifficultyProgress(raw) {
+  const base = emptyDifficultyProgress();
+  RANDOM_DIFFICULTY_LEVELS.forEach(level => {
+    const item = raw && raw[level];
+    if (item && typeof item === 'object') base[level] = {
+      round: Math.max(1, Number(item.round) || 1),
+      answered: Array.isArray(item.answered) ? [...new Set(item.answered)] : []
+    };
+  });
+  return base;
+}
+function difficultyProgressStorageKey() { return 'tango_difficulty_progress_' + activeRange; }
+function saveDifficultyProgressLocal() {
+  try { localStorage.setItem(difficultyProgressStorageKey(), JSON.stringify(uDifficultyProgress)); } catch (e) {}
+}
+function getRangeWordsForDifficulty() {
+  const info = getActiveRangeInfo();
+  return ALL_WORDS.slice(info.lo, info.hi + 1);
+}
+function getDifficultyPoolWords(level, rangeWords = getRangeWordsForDifficulty()) {
+  return rangeWords.filter(w => getWordDifficulty(w, activeRange) === level);
+}
+function difficultyLevelCompleted(level, rangeWords = getRangeWordsForDifficulty()) {
+  const pool = getDifficultyPoolWords(level, rangeWords);
+  if (!pool.length) return true;
+  const p = normalizeDifficultyProgress(uDifficultyProgress)[level];
+  return pool.every(w => p.answered.some(id => String(id) === String(w.id)));
+}
+function allDifficultyLevelsCompletedRound(round, rangeWords = getRangeWordsForDifficulty()) {
+  const progress = normalizeDifficultyProgress(uDifficultyProgress);
+  return RANDOM_DIFFICULTY_LEVELS.every(level => {
+    const pool = getDifficultyPoolWords(level, rangeWords);
+    if (!pool.length) return true;
+    const p = progress[level];
+    if (p.round > round) return true;
+    return p.round === round && pool.every(w => p.answered.some(id => String(id) === String(w.id)));
+  });
+}
+function initializeDifficultyProgress() {
+  if (!uDifficultyProgress) {
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(difficultyProgressStorageKey()) || 'null'); } catch (e) {}
+    uDifficultyProgress = normalizeDifficultyProgress(local);
+    if (!local && !hasCloudDifficultyProgress) {
+      getRangeWordsForDifficulty().forEach(word => {
+        if (!uRoundAnswers.some(id => String(id) === String(word.id))) return;
+        const level = getWordDifficulty(word, activeRange);
+        if (RANDOM_DIFFICULTY_LEVELS.includes(level) && !uDifficultyProgress[level].answered.some(id => String(id) === String(word.id))) {
+          uDifficultyProgress[level].answered.push(word.id);
+        }
+      });
+    }
+  } else {
+    uDifficultyProgress = normalizeDifficultyProgress(uDifficultyProgress);
+  }
+  saveDifficultyProgressLocal();
+}
+function persistDifficultyProgress(updates = {}) {
+  initializeDifficultyProgress();
+  updates['difficultyProgress' + rangeSuffix()] = uDifficultyProgress;
+  saveDifficultyProgressLocal();
+  return updates;
+}
+function markDifficultyWordAnswered(word) {
+  if (!word || isReviewMode) return;
+  initializeDifficultyProgress();
+  const level = getWordDifficulty(word, activeRange);
+  if (!RANDOM_DIFFICULTY_LEVELS.includes(level)) return;
+  const rangeWords = getRangeWordsForDifficulty();
+  const progress = uDifficultyProgress[level];
+  const pool = getDifficultyPoolWords(level, rangeWords);
+  if (pool.length && pool.every(w => progress.answered.some(id => String(id) === String(w.id)))) {
+    if (!allDifficultyLevelsCompletedRound(progress.round, rangeWords)) return;
+    progress.round += 1;
+    progress.answered = [];
+  }
+  if (!progress.answered.some(id => String(id) === String(word.id))) progress.answered.push(word.id);
+}
+function getRandomDifficultyWords(rangeWords) {
+  initializeDifficultyProgress();
+  const pool = getDifficultyPoolWords(randomDifficulty, rangeWords);
+  const progress = uDifficultyProgress[randomDifficulty];
+  const complete = pool.length > 0 && pool.every(w => progress.answered.some(id => String(id) === String(w.id)));
+  if (complete) return allDifficultyLevelsCompletedRound(progress.round, rangeWords) ? pool : [];
+  return pool.filter(w => !progress.answered.some(id => String(id) === String(w.id)));
+}
 function selectRandomDifficulty(level) {
   randomDifficulty = level;
-  ['easy', 'standard', 'hard'].forEach(key => {
+  RANDOM_DIFFICULTY_LEVELS.forEach(key => {
     const btn = document.getElementById('random-difficulty-' + key);
     if (btn) btn.classList.toggle('selected', key === level);
   });
-  const info = getActiveRangeInfo();
-  const words = ALL_WORDS.slice(info.lo, info.hi + 1);
-  const count = getRandomDifficultyWords(words).length;
+  const rangeWords = getRangeWordsForDifficulty();
+  initializeDifficultyProgress();
+  const pool = getDifficultyPoolWords(level, rangeWords);
+  const progress = uDifficultyProgress[level];
+  const complete = pool.length > 0 && pool.every(w => progress.answered.some(id => String(id) === String(w.id)));
+  const allDone = complete && allDifficultyLevelsCompletedRound(progress.round, rangeWords);
+  const count = getRandomDifficultyWords(rangeWords).length;
   const slider = document.getElementById('random-n-slider');
   slider.max = Math.max(1, count);
   if (parseInt(slider.value) > count) slider.value = Math.max(1, count);
+  if (count === 0) slider.value = 1;
   document.getElementById('random-n-val').textContent = slider.value;
-  document.getElementById('random-difficulty-count').textContent = count
-    ? `この難易度の対象：${count}語`
-    : 'この難易度の単語はまだありません。ほかの難易度を選んでください。';
+  const label = document.getElementById('random-difficulty-count');
+  if (!pool.length) label.textContent = 'この範囲ではまだこの難易度に分類された単語がありません。';
+  else if (complete && !allDone) label.textContent = `このレベルの${progress.round}周目は完了！他のレベルも一周するまで次の周回には進めません。`;
+  else if (complete && allDone) label.textContent = `🎉 3レベルの${progress.round}周目が完了！次は${progress.round + 1}周目：${pool.length}語から出題できます。`;
+  else label.textContent = `${progress.round}周目の未出題：${count}語（出題済みの単語は除外）`;
+  const startBtn = document.querySelector('#random-modal .btn-primary');
+  if (startBtn) startBtn.disabled = count === 0;
 }
 
 function openRandomModal() {
@@ -1931,7 +2034,7 @@ document.addEventListener('keydown', event => {
 
 function startRoundStudy() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) { alert("⏳ 読み込み中です！"); return; }
-  isRandomMode = false; isReviewMode = false;
+  isRandomMode = false; isReviewMode = false; isDifficultyRandomMode = false;
   const info = getActiveRangeInfo();
   const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
   const unsubmittedWords = rangeWords.filter(w => !uRoundAnswers.includes(w.id));
@@ -1960,10 +2063,30 @@ function startRandomN() {
     return;
   }
   isRandomMode = true; isReviewMode = false;
-  const n = Math.min(parseInt(document.getElementById('random-n-slider').value) || 10, candidates.length);
-  state.queue = candidates.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
+  initializeDifficultyProgress();
+  const progress = uDifficultyProgress[randomDifficulty];
+  const complete = candidates.length > 0 && candidates.every(w => progress.answered.some(id => String(id) === String(w.id)));
+  if (complete) {
+    if (!allDifficultyLevelsCompletedRound(progress.round, rangeWords)) {
+      alert('このレベルの周回は完了しています。基礎・標準・挑戦の残りのレベルも一周してから、次の周回に進めます。');
+      selectRandomDifficulty(randomDifficulty);
+      return;
+    }
+    progress.round += 1;
+    progress.answered = [];
+  }
+  const available = getRandomDifficultyWords(rangeWords);
+  if (!available.length) {
+    alert('このレベルの未出題単語はありません。他のレベルを先に一周してください。');
+    selectRandomDifficulty(randomDifficulty);
+    return;
+  }
+  const n = Math.min(parseInt(document.getElementById('random-n-slider').value) || 10, available.length);
+  isDifficultyRandomMode = true;
+  state.queue = available.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
   state.current = 0; state.results = [];
   document.getElementById('random-modal').classList.remove('open');
+  saveDifficultyProgressLocal();
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
@@ -1984,6 +2107,7 @@ function startReviewMode() {
   }
   isRandomMode = true;
   isReviewMode = true;
+  isDifficultyRandomMode = false;
   state.queue = wrongWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
   state.current = 0;
   state.results = [];
@@ -2023,7 +2147,8 @@ async function submitAnswer(timedOut = false) {
   uWordHistory[wordId].solved++;
   if (grade === 'wrong') uWordHistory[wordId].wrong++;
   if (isReviewMode && grade === 'correct') uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
-  if (!isRandomMode && !uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
+  if (!isReviewMode && !uRoundAnswers.some(id => String(id) === String(wordId))) uRoundAnswers.push(wordId);
+  if (!isReviewMode) markDifficultyWordAnswered(word);
 
   const cls = grade === 'correct' ? 'result-correct' : grade === 'partial' ? 'result-partial' : 'result-wrong';
   const lbl = grade === 'correct' ? '✓ 正解！' : grade === 'partial' ? '△ 部分正解' : '✗ 不正解';
@@ -2053,6 +2178,7 @@ async function submitAnswer(timedOut = false) {
     updates['totalAnswers' + sfx] = uTotalAnswers;
     updates['totalCorrect' + sfx] = uTotalCorrect;
     updates['wordHistory' + sfx] = uWordHistory;
+    persistDifficultyProgress(updates);
     updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
       .catch(e => console.error('データ即時保存エラー:', e));
@@ -2079,7 +2205,7 @@ function renderRandomReport() {
   const wrongCount = results.filter(r => r.grade === 'wrong').length;
   const accuracy = total ? Math.round(correctCount / total * 100) : 0;
 
-  title.textContent = isReviewMode ? '🔁 復習演習レポート' : '📝 ランダム演習レポート';
+  title.textContent = isReviewMode ? '🔁 復習演習レポート' : (isDifficultyRandomMode ? '🎲 難易度別ランダム演習レポート' : '📝 ランダム演習レポート');
   summary.innerHTML =
     '<div style="font-size:13px;color:#667085;margin-bottom:10px;">' + total + '問中、完全正解 ' + correctCount + '問（正解率 ' + accuracy + '%）</div>' +
     '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">' +
@@ -2127,7 +2253,7 @@ function finishQuizSession() {
     const wrongCount = state.results.filter(r => r.grade === 'wrong').length;
     const accuracy = total ? Math.round(correctCount / total * 100) : 0;
     document.getElementById('result-emoji').textContent = '📋';
-    document.getElementById('result-title').textContent = isReviewMode ? '復習演習完了！' : 'ランダム演習完了！';
+    document.getElementById('result-title').textContent = isReviewMode ? '復習演習完了！' : (isDifficultyRandomMode ? '難易度別ランダム演習完了！' : 'ランダム演習完了！');
     document.getElementById('result-sub').textContent = total + '問中、完全正解 ' + correctCount + '問・部分正解 ' + partialCount + '問・不正解 ' + wrongCount + '問（正解率 ' + accuracy + '%）';
     renderRandomReport();
     showScreen('screen-result');
@@ -2387,7 +2513,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.4 (Enter連続入力防止)"; 
+const APP_VERSION = "v3.5 (難易度別一周目進捗同期)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
