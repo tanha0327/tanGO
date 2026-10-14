@@ -1844,6 +1844,7 @@ function markDifficultyWordAnswered(word) {
     progress.answered = [];
   }
   if (!progress.answered.some(id => String(id) === String(word.id))) progress.answered.push(word.id);
+  saveDifficultyProgressLocal();
 }
 function getRandomDifficultyWords(rangeWords) {
   initializeDifficultyProgress();
