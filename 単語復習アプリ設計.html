@@ -1027,8 +1027,19 @@ function refreshUI() {
     mainBtn.textContent = `✏️ ${uCurrentRound}周目の続きから再開 (残り${remain}問)`;
   }
   
-  updateLeaderboardDisplay();
-  renderWordAccuracyRanking();
+  // 単語ランキングはオンラインランキングに依存せず先に描画する
+  try {
+    renderWordAccuracyRanking();
+  } catch (rankingError) {
+    console.error('単語別正解率ランキングの描画エラー:', rankingError);
+    const rankingEl = document.getElementById('word-accuracy-ranking');
+    if (rankingEl) rankingEl.innerHTML = '<div style="color:#c62828;padding:12px 0;">ランキングの表示に失敗しました。ページを再読み込みしてください。</div>';
+  }
+  try {
+    updateLeaderboardDisplay();
+  } catch (leaderboardError) {
+    console.error('オンラインランキングの更新エラー:', leaderboardError);
+  }
 
   // 👇👇👇 これを一番下に追加！ 👇👇👇
   // 4. 復習単語のカウントと色変え処理
@@ -2619,7 +2630,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.7 (単語別正解率ランキング・問題文修正)"; 
+const APP_VERSION = "v3.8 (単語ランキング描画修正)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
