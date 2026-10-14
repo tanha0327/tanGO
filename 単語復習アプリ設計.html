@@ -1877,7 +1877,7 @@ document.addEventListener('keydown', event => {
   const buttons = rows[index].querySelectorAll('.word-admin-difficulty-btn');
   const choiceIndex = difficulty === 'easy' ? 1 : difficulty === 'standard' ? 2 : 3;
   if (!buttons[choiceIndex] || buttons[choiceIndex].disabled) return;
-  wordAdminKeyboardIndex = Math.min(index + 1, rows.length - 1);
+  wordAdminKeyboardIndex = wordAdminFiltered === 'unclassified' ? index : Math.min(index + 1, rows.length - 1);
   rows[index].querySelectorAll('.word-admin-difficulty-btn')[choiceIndex].click();
 });
 
