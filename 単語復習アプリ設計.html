@@ -1256,7 +1256,7 @@ async function submitAnswer() {
   if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
   uWordHistory[wordId].solved++; if (grade === 'wrong') uWordHistory[wordId].wrong++;
   if (isReviewMode && grade === 'correct') uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
-  if (!isRandomMode && !uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
+  if (!uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
   
   const cls = grade==='correct'?'result-correct':grade==='partial'?'result-partial':'result-wrong';
   const lbl = grade==='correct'?'✓ 正解！':grade==='partial'?'△ 部分正解':'✗ 不正解';
