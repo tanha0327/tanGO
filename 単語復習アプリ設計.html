@@ -504,10 +504,25 @@ function hideSyncLoading() {
 }
 
 // 🚀 画面ロード時の処理（テスト日・範囲、個人の周回データをクラウドから完全同期）
-window.onload = () => {
+document.addEventListener('DOMContentLoaded', () => {
   console.log("🚀 アプリ初期化開始...");
-  
+
+  // window.load は外部画像・アニメーション素材の読み込み待ちで遅れることがあるため、
+  // HTMLの準備ができた時点で認証確認を始める。
+  let authStateResolved = false;
+  const startupWatchdog = setTimeout(() => {
+    if (authStateResolved) return;
+    const titleEl = document.getElementById('sync-loading-title');
+    const messageEl = document.getElementById('sync-loading-message');
+    const retryBtn = document.getElementById('sync-retry-btn');
+    if (titleEl) titleEl.textContent = '起動に時間がかかっています';
+    if (messageEl) messageEl.textContent = 'ログイン状態の確認に応答がありません。通信を確認して再読み込みしてください。';
+    if (retryBtn) retryBtn.style.display = 'inline-block';
+  }, 12000);
+
   auth.onAuthStateChanged(async (user) => {
+    authStateResolved = true;
+    clearTimeout(startupWatchdog);
     // 🌟 1. まずLINEブラウザかどうかを判定する
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isLine = ua.indexOf("Line") > -1;
@@ -591,8 +606,18 @@ window.onload = () => {
       if (appContainer) appContainer.style.display = 'none';
       hideSyncLoading();
     }
+  }, (error) => {
+    authStateResolved = true;
+    clearTimeout(startupWatchdog);
+    console.error('Firebase認証状態の確認エラー:', error);
+    const titleEl = document.getElementById('sync-loading-title');
+    const messageEl = document.getElementById('sync-loading-message');
+    const retryBtn = document.getElementById('sync-retry-btn');
+    if (titleEl) titleEl.textContent = 'ログイン状態を確認できません';
+    if (messageEl) messageEl.textContent = 'Firebaseへの接続に失敗しました。通信を確認して再読み込みしてください。';
+    if (retryBtn) retryBtn.style.display = 'inline-block';
   });
-};
+});
 
 function showScreen(id) {
   stopQuestionTimer();
@@ -1664,7 +1689,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.3 (範囲選択・2学期中間文章題)"; 
+const APP_VERSION = "v2.4 (起動時の同期修正)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
