@@ -2649,7 +2649,7 @@ function openExternalBrowser() {
     return values;
   }
 
-  function sunsetMinutesJST(year, month, day) {
+  function sunTimesJST(year, month, day) {
     const date = new Date(Date.UTC(year, month - 1, day));
     const dayOfYear = Math.floor((date - Date.UTC(year, 0, 0)) / 86400000);
     const gamma = 2 * Math.PI / 365 * (dayOfYear - 1);
@@ -2664,19 +2664,19 @@ function openExternalBrowser() {
     const zenith = 90.833 * Math.PI / 180;
     const cosHourAngle = Math.cos(zenith) / (Math.cos(lat) * Math.cos(decl))
       - Math.tan(lat) * Math.tan(decl);
-    if (cosHourAngle < -1) return 1080;
-    if (cosHourAngle > 1) return 900;
+    if (cosHourAngle < -1) return { sunrise: 0, sunset: 1440 };
+    if (cosHourAngle > 1) return { sunrise: 720, sunset: 720 };
     const hourAngle = Math.acos(cosHourAngle) * 180 / Math.PI;
     const solarNoon = 720 - 4 * LONGITUDE - eqTime + 9 * 60;
-    return solarNoon + 4 * hourAngle;
+    return { sunrise: solarNoon - 4 * hourAngle, sunset: solarNoon + 4 * hourAngle };
   }
 
   function updateTheme() {
     try {
       const now = tokyoNowParts();
       const currentMinutes = now.hour * 60 + now.minute;
-      const sunset = sunsetMinutesJST(now.year, now.month, now.day);
-      const shouldBeDark = currentMinutes >= sunset || currentMinutes < 5 * 60;
+      const sunTimes = sunTimesJST(now.year, now.month, now.day);
+      const shouldBeDark = currentMinutes >= sunTimes.sunset || currentMinutes < sunTimes.sunrise;
       document.documentElement.classList.toggle('dark-mode', shouldBeDark);
       document.documentElement.dataset.theme = shouldBeDark ? 'dark' : 'light';
       document.documentElement.style.colorScheme = shouldBeDark ? 'dark' : 'light';
