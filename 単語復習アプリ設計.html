@@ -141,11 +141,11 @@ function loadT2MidSentenceData(timeoutMs = 4000) {
   }).then(loaded => {
     if (Array.isArray(window.SENTENCES_T2MID) && window.SENTENCES_T2MID.length) loaded = true;
     if (loaded && Array.isArray(window.SENTENCES_T2MID)) {
-      try { localStorage.setItem('tango_t2mid_sentences_cache_v1', JSON.stringify(window.SENTENCES_T2MID)); } catch (e) {}
+      try { localStorage.setItem('tango_t2mid_sentences_cache_v2', JSON.stringify(window.SENTENCES_T2MID)); } catch (e) {}
       return true;
     }
     try {
-      const cached = JSON.parse(localStorage.getItem('tango_t2mid_sentences_cache_v1') || 'null');
+      const cached = JSON.parse(localStorage.getItem('tango_t2mid_sentences_cache_v2') || 'null');
       if (Array.isArray(cached) && cached.length) {
         window.SENTENCES_T2MID = cached;
         return true;
@@ -623,6 +623,14 @@ window.__tangoInitialWatchdog = setTimeout(() => {
         <div class="progress-wrap" style="margin-bottom: 4px;"><div class="progress-bar" id="home-progress-bar" style="width:0%"></div></div>
       </div>
 
+      <div class="card" style="margin-bottom:1.25rem;">
+        <div class="label" style="margin-bottom:6px;">🎯 間違えやすい単語ランキング</div>
+        <div style="font-size:12px;color:#888;margin-bottom:10px;">選択中の範囲・正解率が低い順（解答履歴がある問題）</div>
+        <div id="word-accuracy-ranking" style="font-size:14px;line-height:1.55;">
+          <div style="color:#888;text-align:center;padding:12px 0;">学習データを読み込み中…</div>
+        </div>
+      </div>
+
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
         <div class="label" style="margin-bottom:10px;" id="leaderboard-top3-title">👑 クラウド進捗トップ3 (タップで詳細)</div>
         <div id="home-leaderboard" style="font-size:14px;color:#333;line-height:1.6;"></div>
@@ -941,6 +949,56 @@ function showScreen(id) {
 }
 
 // 📊 画面表示を最新データで再計算して書き換える関数
+// 単語ごとの正解・部分正解・不正解を記録。旧データは正解数を推定して引き継ぐ。
+function recordWordAccuracyHistory(wordId, grade) {
+  const key = String(wordId);
+  if (!uWordHistory[key]) uWordHistory[key] = { solved: 0, wrong: 0, reviewed: 0 };
+  const h = uWordHistory[key];
+  const solvedBefore = Number(h.solved) || 0;
+  const wrongBefore = Number(h.wrong) || 0;
+  if (h.correct == null) h.correct = Math.max(0, solvedBefore - wrongBefore);
+  if (h.partial == null) h.partial = 0;
+  h.solved = solvedBefore + 1;
+  if (grade === 'correct') h.correct++;
+  else if (grade === 'partial') h.partial++;
+  else h.wrong = wrongBefore + 1;
+}
+
+function renderWordAccuracyRanking() {
+  const el = document.getElementById('word-accuracy-ranking');
+  if (!el) return;
+  if (!Array.isArray(ALL_WORDS) || ALL_WORDS.length === 0) {
+    el.innerHTML = '<div style="color:#888;text-align:center;padding:12px 0;">単語データを読み込めていません。</div>';
+    return;
+  }
+  const info = getActiveRangeInfo();
+  const words = ALL_WORDS.slice(info.lo, info.hi + 1);
+  const rows = words.map(word => {
+    const h = uWordHistory[String(word.id)] || uWordHistory[word.id];
+    if (!h || !(Number(h.solved) > 0)) return null;
+    const solved = Number(h.solved) || 0;
+    const wrong = Number(h.wrong) || 0;
+    const correct = h.correct == null ? Math.max(0, solved - wrong) : (Number(h.correct) || 0);
+    return { word, solved, wrong, correct, accuracy: Math.round(correct / solved * 100) };
+  }).filter(Boolean).sort((a, b) => a.accuracy - b.accuracy || b.wrong - a.wrong || b.solved - a.solved).slice(0, 10);
+  if (!rows.length) {
+    el.innerHTML = '<div style="color:#888;text-align:center;padding:12px 0;">まだ解答履歴がありません。問題を解くとランキングが表示されます。</div>';
+    return;
+  }
+  el.innerHTML = rows.map((row, index) => {
+    const label = row.word.sentence || row.word.en || ('単語ID ' + row.word.id);
+    const safeLabel = escapeLeaderboardText(label);
+    const safeAnswer = escapeLeaderboardText(row.word.en || '');
+    const rankColor = index === 0 ? '#c62828' : (index < 3 ? '#ef6c00' : '#667085');
+    return '<div style="display:flex;gap:9px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eee;">' +
+      '<div style="min-width:25px;font-weight:800;color:' + rankColor + ';">' + (index + 1) + '位</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;overflow-wrap:anywhere;">' + safeLabel + '</div>' +
+      (row.word.sentence ? '<div style="font-size:12px;color:#777;margin-top:2px;">答え：' + safeAnswer + '</div>' : '') +
+      '<div style="font-size:12px;color:#777;margin-top:3px;">正解率 ' + row.accuracy + '% ・ ' + row.correct + '/' + row.solved + '回正解 ・ 不正解 ' + row.wrong + '回</div></div>' +
+      '<div style="font-weight:800;color:' + (row.accuracy < 50 ? '#c62828' : '#333') + ';white-space:nowrap;">' + row.accuracy + '%</div></div>';
+  }).join('') + '<div style="font-size:11px;color:#999;margin-top:8px;">※ 以前の履歴は正解数を推定している場合があります。</div>';
+}
+
 function refreshUI() {
   const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
   
@@ -970,6 +1028,7 @@ function refreshUI() {
   }
   
   updateLeaderboardDisplay();
+  renderWordAccuracyRanking();
 
   // 👇👇👇 これを一番下に追加！ 👇👇👇
   // 4. 復習単語のカウントと色変え処理
@@ -1169,12 +1228,7 @@ async function submitAnswer(timedOut = false) {
   if(grade === 'correct') uTotalCorrect++;
   
   // ─── 🌟 ここからが新しい履歴更新ロジック ───
-  if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
-  uWordHistory[wordId].solved++;
-  
-  if (grade === 'wrong') {
-    uWordHistory[wordId].wrong++; // 間違えたら通常通りカウントアップ
-  }
+  recordWordAccuracyHistory(wordId, grade);
   
   // 🌟 復習モードで見事正解したら、過去の間違い回数とチャラにして「一発クリア」！
   if (isReviewMode && grade === 'correct') {
@@ -2197,9 +2251,7 @@ async function submitAnswer(timedOut = false) {
 
   uTotalAnswers++;
   if (grade === 'correct') uTotalCorrect++;
-  if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
-  uWordHistory[wordId].solved++;
-  if (grade === 'wrong') uWordHistory[wordId].wrong++;
+  recordWordAccuracyHistory(wordId, grade);
   if (isReviewMode && grade === 'correct') uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
   if (!isReviewMode && !uRoundAnswers.some(id => String(id) === String(wordId))) uRoundAnswers.push(wordId);
   if (!isReviewMode) markDifficultyWordAnswered(word);
