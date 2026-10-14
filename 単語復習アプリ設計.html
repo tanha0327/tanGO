@@ -1554,9 +1554,6 @@ async function exitQuizDirect() {
       updates['roundAnswers' + sfx] = uRoundAnswers;
       updates['totalAnswers' + sfx] = uTotalAnswers;
       updates['totalCorrect' + sfx] = uTotalCorrect;
-    updates['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
-    updates['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
-    updates['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
       updates['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
       updates['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
       updates['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
@@ -1913,7 +1910,7 @@ function refreshUI() {
   if (info.total === 0) return;
 
   const progressPercent = Math.floor((uRoundAnswers.length / info.total) * 100);
-  const accuracyPercent = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+  const accuracyPercent = uLastRoundAccuracy;
   
   document.getElementById('home-progress-text').textContent = `${uCurrentRound}周目 ${progressPercent}%`;
   document.getElementById('home-progress-count').textContent = `(${uRoundAnswers.length} / ${info.total}語)`;
