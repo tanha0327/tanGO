@@ -419,7 +419,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
       </div>
     </div>
 
-    <div class="screen" id="screen-quiz" onclick="handleQuizTap(event)">
+    <div class="screen" id="screen-quiz">
       <div class="quiz-header">
         <div style="display:flex;align-items:center;gap:8px;"><span id="quiz-counter" style="font-size:13px;color:#888;"></span><span id="quiz-timer" style="font-size:13px;font-weight:800;color:#264653;background:#e9c46a;padding:7px 10px;border-radius:10px;white-space:nowrap;">10秒</span></div>
         <button class="exit-btn" onclick="event.stopPropagation();document.getElementById('exit-modal').classList.add('open')">✕ 保存して退出</button>
@@ -429,7 +429,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
         <div id="quiz-word" class="quiz-word"></div>
         <div id="quiz-hint" class="quiz-hint"></div>
         <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();submitAnswer()}"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
-        <button class="big-btn btn-secondary" id="btn-reveal" onclick="revealAnswer()" style="margin-top:10px;margin-bottom:0;padding:11px;font-size:13px;">答えを見る</button>
         <div id="quiz-result" style="display:none;margin-top:12px;"></div>
       </div>
       <div id="quiz-tap-hint" style="text-align:center;color:#777;font-size:12px;margin-top:10px;">答えが出たら画面のどこをタップしても次へ進みます。</div>
@@ -798,7 +797,6 @@ function renderQuestion() {
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
-  document.getElementById('btn-reveal').style.display = 'block';
   document.getElementById('quiz-tap-hint').textContent = '制限時間内に回答。答えが出たら画面のどこをタップしても次へ進みます。';
   startQuestionTimer();
   // 自動フォーカスを外し、スマホでキーボードが勝手に開くのを防ぐ。
@@ -852,7 +850,6 @@ async function submitAnswer(timedOut = false) {
   
   document.getElementById('quiz-answer').disabled = true;
   document.getElementById('btn-submit').style.display = 'none';
-  document.getElementById('btn-reveal').style.display = 'none';
   document.getElementById('quiz-timer').textContent = timedOut ? '時間切れ' : '回答済み';
   document.getElementById('quiz-tap-hint').textContent = '画面のどこをタップしても次の問題へ進みます。';
 
@@ -886,24 +883,21 @@ async function submitAnswer(timedOut = false) {
   }
 }
 
-function revealAnswer() {
-  if (questionAnswered) return;
-  const item = state.queue[state.current].word;
-  const correct = item.en;
-  const resEl = document.getElementById("quiz-result");
-  resEl.innerHTML = '<div class="result-box result-partial"><strong>💡 模範解答</strong><br><strong>' + escHtml(correct) + '</strong></div>';
-  resEl.style.display = "block";
-  document.getElementById("quiz-answer").disabled = true;
-  document.getElementById("btn-submit").style.display = "none";
-  document.getElementById("btn-reveal").style.display = "none";
-  questionAnswered = true; stopQuestionTimer();
-  document.getElementById("quiz-timer").textContent = "答え";
-  document.getElementById("quiz-tap-hint").textContent = "画面のどこをタップしても次の問題へ進みます。";
-}
 function handleQuizTap(event) {
   if (!questionAnswered) return;
-  if (event.target.closest(".exit-btn, .modal-box")) return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target && target.closest(".exit-btn, #exit-modal, .modal-box")) return;
   nextQuestion();
+}
+if (!window.__tangoQuizTapHandlerInstalled) {
+  window.__tangoQuizTapHandlerInstalled = true;
+  document.addEventListener("click", event => {
+    const quizScreen = document.getElementById("screen-quiz");
+    if (!quizScreen || !quizScreen.classList.contains("visible") || !questionAnswered) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest(".exit-btn, #exit-modal, .modal-box")) return;
+    handleQuizTap(event);
+  }, true);
 }
 function nextQuestion() {
   if (!questionAnswered) return;
@@ -1177,12 +1171,7 @@ function playTangoEffect(callback) {
     <div style="position: relative; width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center;">
       <div id="lottie-container" style="width: 100%; height: auto;"></div>
       
-      <!-- 🌟 「O」の透明な判定用ボタン -->
-      <div id="btn-trigger-o" style="position: absolute; top: 10%; left: 65%; width: 20%; height: 80%; cursor: pointer; z-index: 10;"></div>
-      
-      <p id="lottie-hint" style="color: #888; font-size: 14px; font-weight: bold; margin-top: 10px; transition: 0.3s;">
-        「O」をタップしてスタート！
-      </p>
+      <p id="lottie-hint" style="color: #888; font-size: 14px; font-weight: bold; margin-top: 10px; transition: 0.3s;">準備中…</p>
     </div>
   `;
 
@@ -1194,19 +1183,14 @@ function playTangoEffect(callback) {
     container: document.getElementById('lottie-container'), 
     renderer: 'svg',
     loop: false,
-    autoplay: false,
+    autoplay: true,
     animationData: animationData
   });
 
-  const triggerO = document.getElementById('btn-trigger-o');
   const hintText = document.getElementById('lottie-hint');
-
-  // 🌟 「O」をタップした時の処理
-  triggerO.onclick = () => {
-    triggerO.style.display = 'none'; // 連打防止
-    hintText.style.opacity = '0';    // ヒント非表示
-    anim.play();                    // アニメーション再生！
-  };
+  anim.addEventListener('DOMLoaded', () => {
+    if (hintText) hintText.style.opacity = '0';
+  });
 
   // 🌟 再生完了後の処理
   anim.addEventListener('complete', () => {
