@@ -972,7 +972,7 @@ function finishQuizSession() {
 }
 
 // 💾 現在の学習データを保存してホームへ戻る
-async async function exitQuizDirect() {
+async function exitQuizDirect() {
   const exitBtn = document.getElementById('btn-save-exit');
   if (exitBtn) { exitBtn.disabled = true; exitBtn.textContent = '保存中…'; }
   let saveTimedOut = false;
