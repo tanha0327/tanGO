@@ -296,6 +296,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 <div id="sync-loading" role="status" aria-live="polite">
   <div class="sync-spinner" aria-hidden="true"></div>
   <div id="sync-loading-title">学習データを準備しています</div>
+  <div id="sync-loading-percent" style="font-size:32px;font-weight:850;letter-spacing:-1px;font-variant-numeric:tabular-nums;">0%</div>
+  <div style="width:min(320px,85vw);height:9px;border-radius:99px;background:#dce9e7;overflow:hidden;" role="progressbar" aria-label="学習データの準備状況" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="sync-loading-progress">
+    <div id="sync-loading-bar" style="height:100%;width:0%;border-radius:99px;background:#2a9d8f;transition:width .25s ease;"></div>
+  </div>
+  <div id="sync-loading-stage" style="font-size:13px;font-weight:700;color:#2a9d8f;">起動準備中</div>
   <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
   <button id="sync-retry-btn" onclick="window.location.reload()" style="display:none;padding:10px 18px;border:0;border-radius:10px;background:#2a9d8f;color:white;font-weight:700;">再読み込みして再試行</button>
 </div>
@@ -567,6 +572,40 @@ async function initDictionary() {
 }
 
 let syncWatchdog = null;
+
+// 起動に必要な処理ごとの重み。完了した処理の割合を合算して表示する。
+const SYNC_TASK_WEIGHTS = { boot: 5, auth: 10, vocabulary: 35, sentences: 15, target: 10, user: 15, ui: 10 };
+function resetSyncProgress() {
+  window.__tangoSyncTasks = { boot: 100, auth: 0, vocabulary: 0, sentences: 0, target: 0, user: 0, ui: 0 };
+  window.__tangoSyncPercent = 0;
+  updateSyncProgressDisplay('起動準備中', 'ページの準備ができました。ログイン状態を確認しています。');
+}
+function setSyncTaskProgress(task, value, stage, message) {
+  if (!window.__tangoSyncTasks) resetSyncProgress();
+  const current = Number(window.__tangoSyncTasks[task] || 0);
+  window.__tangoSyncTasks[task] = Math.max(current, Math.min(100, Math.max(0, Number(value) || 0)));
+  let total = 0;
+  Object.keys(SYNC_TASK_WEIGHTS).forEach(key => {
+    total += SYNC_TASK_WEIGHTS[key] * (Number(window.__tangoSyncTasks[key] || 0) / 100);
+  });
+  // 並列処理の完了順で表示率が戻らないようにする
+  const percent = Math.max(Number(window.__tangoSyncPercent || 0), Math.min(100, Math.floor(total)));
+  window.__tangoSyncPercent = percent;
+  updateSyncProgressDisplay(stage, message, percent);
+}
+function updateSyncProgressDisplay(stage, message, percent) {
+  const value = Number(percent == null ? (window.__tangoSyncPercent || 0) : percent);
+  const percentEl = document.getElementById('sync-loading-percent');
+  const barEl = document.getElementById('sync-loading-bar');
+  const progressEl = document.getElementById('sync-loading-progress');
+  const stageEl = document.getElementById('sync-loading-stage');
+  const messageEl = document.getElementById('sync-loading-message');
+  if (percentEl) percentEl.textContent = value + '%';
+  if (barEl) barEl.style.width = value + '%';
+  if (progressEl) progressEl.setAttribute('aria-valuenow', String(value));
+  if (stageEl && stage) stageEl.textContent = stage;
+  if (messageEl && message) messageEl.textContent = message;
+}
 function showSyncLoading(title, message) {
   const overlay = document.getElementById('sync-loading');
   const titleEl = document.getElementById('sync-loading-title');
@@ -595,6 +634,8 @@ function hideSyncLoading() {
 
 // 🚀 画面ロード時の処理（テスト日・範囲、個人の周回データをクラウドから完全同期）
 function startTangoAuthListener() {
+  resetSyncProgress();
+  setSyncTaskProgress('boot', 100, '起動準備完了', 'ログイン状態を確認しています。');
   console.log("🚀 アプリ初期化開始...");
 
   // window.load は外部画像・アニメーション素材の読み込み待ちで遅れることがあるため、
@@ -613,6 +654,7 @@ function startTangoAuthListener() {
   auth.onAuthStateChanged(async (user) => {
     authStateResolved = true;
     clearTimeout(startupWatchdog);
+    setSyncTaskProgress('auth', 100, 'ログイン状態を確認しました', '学習データの取得先を準備しています。');
     // 匿名認証ユーザーは問題演習できるゲストとして扱い、学習データは保存しない
     isGuest = Boolean(user && user.isAnonymous);
     // 🌟 1. まずLINEブラウザかどうかを判定する
@@ -639,7 +681,11 @@ function startTangoAuthListener() {
 
     if (user) {
       // ログイン済み：同期が終わるまでローディングを重ねて仮の進捗を隠す
-      showSyncLoading('学習データを同期しています', '単語・テスト日・あなたの学習進捗を読み込んでいます。');
+      showSyncLoading('学習データを準備しています', '完了した読み込み処理に応じて進捗率を更新します。');
+      setSyncTaskProgress('vocabulary', 0, '単語データを読み込み中', '単語データをクラウドから取得しています。');
+      setSyncTaskProgress('sentences', 0, '文章題データを確認中', '2学期中間の文章題データを確認しています。');
+      setSyncTaskProgress('target', 0, 'テスト情報を読み込み中', 'テスト日を確認しています。');
+      setSyncTaskProgress('user', 0, '学習進捗を読み込み中', 'あなたの学習履歴を確認しています。');
       if (loginScreen) loginScreen.style.display = 'none';
       if (appContainer) appContainer.style.display = 'block';
 
@@ -648,11 +694,25 @@ function startTangoAuthListener() {
       const targetDatePromise = withTimeoutFallback(
         db.collection('vocabulary').doc('active_test').get(),
         4500, null, '共通目標の取得'
-      ).catch(e => { console.error('共通目標の取得に失敗:', e); return null; });
+      ).then(targetDoc => {
+        setSyncTaskProgress('target', 100, 'テスト情報を確認しました', targetDoc && targetDoc.exists ? 'テスト日を読み込みました。' : '共通テスト日の設定を確認しました。');
+        return targetDoc;
+      }).catch(e => {
+        console.error('共通目標の取得に失敗:', e);
+        setSyncTaskProgress('target', 100, 'テスト情報を確認しました', '共通テスト日の取得を終了しました。');
+        return null;
+      });
       const userDocPromise = withTimeoutFallback(
         db.collection('users').doc(user.uid).get(),
         4500, null, 'ユーザーデータ取得'
-      ).catch(e => { console.error('ユーザーデータ取得エラー:', e); return null; });
+      ).then(userDoc => {
+        setSyncTaskProgress('user', 100, '学習進捗を確認しました', userDoc && userDoc.exists ? 'あなたの学習履歴を読み込みました。' : '新しい学習データを準備しています。');
+        return userDoc;
+      }).catch(e => {
+        console.error('ユーザーデータ取得エラー:', e);
+        setSyncTaskProgress('user', 100, '学習進捗を確認しました', '学習履歴の取得を終了しました。');
+        return null;
+      });
 
       await Promise.all([
         initDictionary(),
@@ -694,6 +754,7 @@ function startTangoAuthListener() {
 
       startCountdown();
       refreshUI();
+      setSyncTaskProgress('ui', 100, '準備完了', '学習データの読み込みが完了しました。');
       hideSyncLoading();
 
     } else if (typeof isGuest !== 'undefined' && !isGuest) {
@@ -1374,7 +1435,12 @@ function getActiveRangeInfo() {
 // ☁️ Firebaseから単語を読み込むだけの超スッキリ版！
 async function initDictionary() {
   // 文章題スクリプトとFirestoreを並列で読み込み、どちらかの応答待ちで永久停止しない
-  const sentencePromise = loadT2MidSentenceData(4000);
+  setSyncTaskProgress('vocabulary', 0, '単語データを取得中', '単語データをクラウドから取得しています。');
+  setSyncTaskProgress('sentences', 0, '文章題データを取得中', '文章題データを読み込んでいます。');
+  const sentencePromise = loadT2MidSentenceData(4000).then(loaded => {
+    setSyncTaskProgress('sentences', 100, loaded ? '文章題データを読み込みました' : '文章題データを確認しました', loaded ? '文章題データの準備ができました。' : '文章題データの取得が完了しました。');
+    return loaded;
+  });
   const cloudPromise = Promise.all([
     db.collection('vocabulary').doc('midterm').get(),
     db.collection('vocabulary').doc('final').get(),
@@ -1393,6 +1459,7 @@ async function initDictionary() {
   });
 
   let cloudData = await withTimeoutFallback(cloudPromise, 5000, null, 'Firestore単語データ');
+  setSyncTaskProgress('vocabulary', 100, cloudData ? '単語データを読み込みました' : '単語データの取得を確認しました', cloudData ? '単語データを受け取りました。' : 'クラウド単語データの取得処理を終了しました。');
   const sentenceLoaded = await sentencePromise;
 
   const hasCloudWords = data => data && (
@@ -1961,7 +2028,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.7 (起動待ち対策)"; 
+const APP_VERSION = "v2.8 (読み込み進捗表示)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
