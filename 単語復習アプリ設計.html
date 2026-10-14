@@ -765,7 +765,7 @@ function renderQuestion() {
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
   document.getElementById('btn-next').style.display = 'none';
-  setTimeout(()=>document.getElementById('quiz-answer').focus(), 50);
+  // 自動フォーカスを外し、スマホでキーボードが勝手に開くのを防ぐ。
 }
 
 // 🌟 解答が送信された瞬間に、裏でクラウドデータベースへリアルタイム保存！
