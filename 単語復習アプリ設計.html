@@ -217,10 +217,38 @@ function selectRange(key) {
 function updateRangeButton() {
   const btn = document.getElementById('btn-range-select'); if (!btn) return;
   const o = RANGE_OPTIONS.find(x => x.key === activeRange);
-  const rn = o ? o.label.replace(/^\S+\s*/, '') : '';
+  const rn = o ? o.label.replace(/^\\S+\\s*/, '') : '';
   const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `👑 ${rn} 進捗トップ3 (タップで詳細)`;
   const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `🏆 ${rn} 進捗ランキング`;
-  btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\S+\s*/, '') : ''}（タップで変更）`;
+  btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\\S+\\s*/, '') : ''}（タップで変更）`;
+  // re特訓ボタンは2学期中間モードのときだけ表示
+  const reBtn = document.getElementById('btn-re-practice');
+  if (reBtn) reBtn.style.display = activeRange === 't2mid' ? 'block' : 'none';
+}
+
+function startReWordPractice() {
+  if (!ALL_WORDS || ALL_WORDS.length === 0) {
+    alert('単語データを読み込み中です。少し待ってからもう一度押してください。');
+    return;
+  }
+  if (activeRange !== 't2mid') return;
+
+  const info = getActiveRangeInfo();
+  const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
+  const reWords = rangeWords.filter(w => /^re/i.test(String(w.en || '').trim()));
+
+  if (reWords.length === 0) {
+    alert('2学期中間の範囲に、reで始まる単語が見つかりませんでした。');
+    return;
+  }
+
+  // 通常の周回進捗とは分離した特別練習。採点・単語ごとの履歴は通常どおり記録する。
+  isRandomMode = true;
+  isReviewMode = false;
+  state.queue = reWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
+  state.current = 0;
+  state.results = [];
+  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -603,6 +631,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       </div>
       
       <button id="btn-range-select" class="big-btn btn-secondary" style="margin-bottom:10px; font-weight:700;" onclick="openRangeModal()">📚 テスト範囲を選ぶ</button>
+      <button id="btn-re-practice" class="big-btn btn-primary" style="display:none; margin-bottom:10px; font-weight:700;" onclick="startReWordPractice()">🔤 reで始まる単語だけ練習</button>
 
       <div class="countdown-card" id="countdown-card">
         <div style="font-size:10px; opacity:0.8; margin-bottom:4px;" id="countdown-label">テスト日を設定してください</div>
