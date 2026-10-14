@@ -794,7 +794,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
         <div class="card" style="padding:1rem;">
           <div id="random-report-title" style="font-size:18px;font-weight:800;color:#264653;margin-bottom:12px;">今回の演習レポート</div>
           <div id="random-report-summary" style="margin-bottom:16px;"></div>
-          <div id="random-report-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+          <details id="random-report-details" style="border:1px solid #dbe3ea;border-radius:12px;background:#fff;overflow:hidden;"><summary id="random-report-details-summary" style="cursor:pointer;padding:14px;font-weight:800;color:#344054;background:#f8fafc;user-select:none;">📚 単語ごとの結果を見る</summary><div id="random-report-list" style="display:flex;flex-direction:column;gap:10px;padding:12px;"></div></details>
         </div>
       </div>
       <button class="big-btn btn-primary" id="btn-result-home" onclick="showScreen('screen-home');refreshUI();">🏠 ホームへ戻る</button>
@@ -2522,10 +2522,14 @@ function renderRandomReport() {
   const title = document.getElementById('random-report-title');
   const summary = document.getElementById('random-report-summary');
   const list = document.getElementById('random-report-list');
+  const detailsSummary = document.getElementById('random-report-details-summary');
+  const details = document.getElementById('random-report-details');
   if (!report || !summary || !list) return;
 
   const results = state.results || [];
   const total = results.length;
+  if (detailsSummary) detailsSummary.textContent = '📚 単語ごとの結果を見る（' + total + '問）';
+  if (details) details.open = false;
   const correctCount = results.filter(r => r.grade === 'correct').length;
   const partialCount = results.filter(r => r.grade === 'partial').length;
   const wrongCount = results.filter(r => r.grade === 'wrong').length;
@@ -2839,7 +2843,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v4.5 (間違えた回数別グループ特訓)"; 
+const APP_VERSION = "v4.6 (レポートの単語別結果を折りたたみ表示)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
