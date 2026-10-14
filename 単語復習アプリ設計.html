@@ -957,10 +957,19 @@ async async function exitQuizDirect() {
   const exitBtn = document.getElementById('btn-save-exit');
   if (exitBtn) { exitBtn.disabled = true; exitBtn.textContent = '保存中…'; }
   let saveTimedOut = false;
-  const withSaveTimeout = promise => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => { saveTimedOut = true; reject(new Error('保存がタイムアウトしました')); }, 10000))
-  ]);
+  const withSaveTimeout = promise => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      saveTimedOut = true;
+      reject(new Error('保存がタイムアウトしました'));
+    }, 10000);
+    Promise.resolve(promise).then(value => {
+      clearTimeout(timer);
+      resolve(value);
+    }, error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
   try {
     if (!isGuest && auth.currentUser) {
       const sfx = rangeSuffix();
@@ -1508,6 +1517,12 @@ function tickCountdown() {
 }
 
 // 🌟 ランキングの読み込み先も範囲に合わせて自動切り替え
+function escapeLeaderboardText(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[char]);
+}
+
 function updateLeaderboardDisplay(forceRefresh = false) {
   const homeLeaderboard = document.getElementById('home-leaderboard');
   if (!homeLeaderboard) return;
