@@ -217,10 +217,10 @@ function selectRange(key) {
 function updateRangeButton() {
   const btn = document.getElementById('btn-range-select'); if (!btn) return;
   const o = RANGE_OPTIONS.find(x => x.key === activeRange);
-  const rn = o ? o.label.replace(/^\\S+\\s*/, '') : '';
+  const rn = o ? o.label.replace(/^\S+\s*/, '') : '';
   const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `👑 ${rn} 進捗トップ3 (タップで詳細)`;
   const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `🏆 ${rn} 進捗ランキング`;
-  btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\\S+\\s*/, '') : ''}（タップで変更）`;
+  btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\S+\s*/, '') : ''}（タップで変更）`;
   // re特訓ボタンは2学期中間モードのときだけ表示
   const reBtn = document.getElementById('btn-re-practice');
   if (reBtn) reBtn.style.display = activeRange === 't2mid' ? 'block' : 'none';
