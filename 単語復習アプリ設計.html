@@ -300,9 +300,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 
   <div class="modal-overlay" id="random-modal">
     <div class="modal-box">
-      <div class="modal-title">🎲 テスト範囲からランダムN問</div>
-      <div style="text-align:center; font-size:22px; font-weight:700; color:#2D7DD2; margin-bottom:4px;"><span id="random-n-val">50</span>問</div>
-      <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="50" oninput="document.getElementById('random-n-val').textContent=this.value"></div>
+      <div class="modal-title">🎲 難易度を選んでランダム演習</div>
+      <div style="font-size:12px;color:#777;text-align:center;margin-bottom:12px;">解答履歴から、今の自分に合う単語を出題します</div>
+      <div class="option-grid" style="margin-bottom:16px;">
+        <button type="button" class="opt-btn" id="random-difficulty-easy" onclick="selectRandomDifficulty('easy')">🟢 基礎<br><small>正解できる単語</small></button>
+        <button type="button" class="opt-btn selected" id="random-difficulty-standard" onclick="selectRandomDifficulty('standard')">🔵 標準<br><small>初見・練習中</small></button>
+        <button type="button" class="opt-btn" id="random-difficulty-hard" onclick="selectRandomDifficulty('hard')" style="grid-column:1 / -1;">🔴 挑戦<br><small>要復習の単語</small></button>
+      </div>
+      <div style="text-align:center;font-size:22px;font-weight:700;color:#2D7DD2;margin-bottom:4px;"><span id="random-n-val">10</span>問</div>
+      <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="10" oninput="document.getElementById('random-n-val').textContent=this.value"></div>
+      <div id="random-difficulty-count" style="font-size:12px;color:#888;text-align:center;margin-top:8px;"></div>
       <div class="modal-btns" style="margin-top:20px;">
         <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.remove('open')">戻る</button>
         <button class="big-btn btn-primary" onclick="startRandomN()">開始</button>
@@ -1191,12 +1198,39 @@ function refreshUI() {
   }
 }
 
-function openRandomModal() {
+let randomDifficulty = 'standard';
+
+function getRandomDifficultyWords(rangeWords) {
+  return rangeWords.filter(w => {
+    const h = uWordHistory[w.id];
+    const hasUnresolvedMistake = h && (h.wrong || 0) > (h.reviewed || 0);
+    if (randomDifficulty === 'easy') return !!h && (h.solved || 0) > 0 && !hasUnresolvedMistake;
+    if (randomDifficulty === 'hard') return !!hasUnresolvedMistake;
+    // 標準は未学習、またはまだ正解が安定していない単語
+    return !h || (h.solved || 0) === 0 || hasUnresolvedMistake;
+  });
+}
+
+function selectRandomDifficulty(level) {
+  randomDifficulty = level;
+  ['easy', 'standard', 'hard'].forEach(key => {
+    const btn = document.getElementById('random-difficulty-' + key);
+    if (btn) btn.classList.toggle('selected', key === level);
+  });
   const info = getActiveRangeInfo();
+  const words = ALL_WORDS.slice(info.lo, info.hi + 1);
+  const count = getRandomDifficultyWords(words).length;
   const slider = document.getElementById('random-n-slider');
-  slider.max = info.total;
-  if(parseInt(slider.value) > info.total) slider.value = info.total;
+  slider.max = Math.max(1, count);
+  if (parseInt(slider.value) > count) slider.value = Math.max(1, count);
   document.getElementById('random-n-val').textContent = slider.value;
+  document.getElementById('random-difficulty-count').textContent = count
+    ? `この難易度の対象：${count}語`
+    : 'この難易度の単語はまだありません。ほかの難易度を選んでください。';
+}
+
+function openRandomModal() {
+  selectRandomDifficulty(randomDifficulty);
   document.getElementById('random-modal').classList.add('open');
 }
 
@@ -1223,11 +1257,16 @@ function startRoundStudy() {
 
 function startRandomN() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) return;
-  isRandomMode = true; isReviewMode = false;
-  const n = parseInt(document.getElementById('random-n-slider').value);
   const info = getActiveRangeInfo();
   const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
-  state.queue = rangeWords.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
+  const candidates = getRandomDifficultyWords(rangeWords);
+  if (candidates.length === 0) {
+    alert('この難易度の単語はまだありません。別の難易度を選んでください。');
+    return;
+  }
+  isRandomMode = true; isReviewMode = false;
+  const n = Math.min(parseInt(document.getElementById('random-n-slider').value) || 10, candidates.length);
+  state.queue = candidates.map(w => ({word: w, dir: 'jp-en'})).sort(() => Math.random() - 0.5).slice(0, n);
   state.current = 0; state.results = [];
   document.getElementById('random-modal').classList.remove('open');
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
