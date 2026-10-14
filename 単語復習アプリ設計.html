@@ -1663,9 +1663,9 @@ function wordDifficultyKey(rangeKey, wordId) {
 }
 
 function getWordDifficulty(word, rangeKey = activeRange) {
-  // 新方式は範囲ごとに保存。旧形式の分類は、まだ範囲別設定がない単語の初期値として互換利用。
+  // 難易度は範囲ごとに独立して管理する。別範囲の分類を流用しない。
   const scoped = wordDifficultyMap[wordDifficultyKey(rangeKey, word.id)];
-  return scoped !== undefined ? scoped : (wordDifficultyMap[String(word.id)] || '');
+  return scoped !== undefined ? scoped : '';
 }
 
 async function loadWordDifficulties() {
