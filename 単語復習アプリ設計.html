@@ -256,7 +256,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 .screen.visible { display: block; }
 .card { background: white; border: none; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04); }
 .label { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;}
-.option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.option-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.opt-btn small { display:block; font-size:11px; font-weight:500; margin-top:4px; }
+.word-admin-list { display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow-y:auto; margin-top:12px; }
+.word-admin-row { display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:8px; align-items:center; padding:10px; border:1px solid #e8e8e8; border-radius:10px; background:#fff; }
+.word-admin-en { font-weight:700; overflow-wrap:anywhere; }
+.word-admin-jp { font-size:12px; color:#777; margin-top:3px; }
+.word-admin-select { width:100%; padding:8px 4px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#333; }
 .opt-btn { padding: 14px 10px; border: 2px solid #f0f0f0; background: white; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: 600; color: #444; text-align: center; width: 100%; transition: all 0.2s ease; }
 .opt-btn:hover { border-color: #d8d8d8; background: #fafafa; }
 .opt-btn.selected { border-color: #2a9d8f; background: rgba(42, 157, 143, 0.05); color: #2a9d8f; }
@@ -454,11 +460,11 @@ window.__tangoInitialWatchdog = setTimeout(() => {
   <div class="modal-overlay" id="random-modal">
     <div class="modal-box">
       <div class="modal-title">🎲 難易度を選んでランダム演習</div>
-      <div style="font-size:12px;color:#777;text-align:center;margin-bottom:12px;">解答履歴から、今の自分に合う単語を出題します</div>
+      <div style="font-size:12px;color:#777;text-align:center;margin-bottom:12px;">単語ごとに設定した難易度から出題します</div>
       <div class="option-grid" style="margin-bottom:16px;">
-        <button type="button" class="opt-btn" id="random-difficulty-easy" onclick="selectRandomDifficulty('easy')">🟢 基礎<br><small>正解できる単語</small></button>
-        <button type="button" class="opt-btn selected" id="random-difficulty-standard" onclick="selectRandomDifficulty('standard')">🔵 標準<br><small>初見・未回答</small></button>
-        <button type="button" class="opt-btn" id="random-difficulty-hard" onclick="selectRandomDifficulty('hard')" style="grid-column:1 / -1;">🔴 挑戦<br><small>要復習の単語</small></button>
+        <button type="button" class="opt-btn" id="random-difficulty-easy" onclick="selectRandomDifficulty('easy')">🟢 基礎<br><small>やさしい単語</small></button>
+        <button type="button" class="opt-btn selected" id="random-difficulty-standard" onclick="selectRandomDifficulty('standard')">🔵 標準<br><small>普通の単語</small></button>
+        <button type="button" class="opt-btn" id="random-difficulty-hard" onclick="selectRandomDifficulty('hard')">🔴 挑戦<br><small>難しい単語</small></button>
       </div>
       <div style="text-align:center;font-size:22px;font-weight:700;color:#2D7DD2;margin-bottom:4px;"><span id="random-n-val">10</span>問</div>
       <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="10" oninput="document.getElementById('random-n-val').textContent=this.value"></div>
@@ -466,6 +472,24 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       <div class="modal-btns" style="margin-top:20px;">
         <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.remove('open')">戻る</button>
         <button class="big-btn btn-primary" onclick="startRandomN()">開始</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="word-admin-modal">
+    <div class="modal-box" style="max-width:620px;">
+      <div class="modal-title">🛠️ 単語難易度の管理</div>
+      <div style="font-size:12px;color:#777;margin-bottom:10px;">単語を「基礎・標準・挑戦」に分類して保存します。未分類から始められます。</div>
+      <input id="word-admin-search" type="search" placeholder="英単語・日本語で検索" oninput="renderWordAdminList()" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid #ddd;border-radius:10px;">
+      <div class="option-grid" style="margin-top:10px;">
+        <button class="opt-btn selected" id="word-admin-filter-unclassified" onclick="setWordAdminFilter('unclassified')">未分類</button>
+        <button class="opt-btn" id="word-admin-filter-all" onclick="setWordAdminFilter('all')">すべて</button>
+        <button class="opt-btn" id="word-admin-filter-hard" onclick="setWordAdminFilter('hard')">挑戦</button>
+      </div>
+      <div id="word-admin-summary" style="font-size:12px;color:#777;margin-top:8px;"></div>
+      <div id="word-admin-list" class="word-admin-list"></div>
+      <div class="modal-btns" style="margin-top:16px;">
+        <button class="big-btn btn-secondary" onclick="document.getElementById('word-admin-modal').classList.remove('open')">閉じる</button>
       </div>
     </div>
   </div>
@@ -621,6 +645,7 @@ async function initDictionary() {
       await db.collection('vocabulary').doc('final').set({ title: "期末 (1542〜1683)", words: ALL_WORDS.slice(141) });
     }
 
+    await loadWordDifficulties();
     ALL_WORDS.forEach(w => {
       w.en = w.en
         .replace(/\[.*?\]/g, '') 
@@ -719,6 +744,7 @@ function startTangoAuthListener() {
     setSyncTaskProgress('auth', 100, 'ログイン状態を確認しました', '学習データの取得先を準備しています。');
     // 匿名認証ユーザーは問題演習できるゲストとして扱い、学習データは保存しない
     isGuest = Boolean(user && user.isAnonymous);
+    updateWordAdminButton(user);
     // 🌟 1. まずLINEブラウザかどうかを判定する
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isLine = ua.indexOf("Line") > -1;
@@ -1610,16 +1636,25 @@ function refreshUI() {
 }
 
 let randomDifficulty = 'standard';
+const ADMIN_EMAIL = 'hanta0327@gmail.com';
+let wordDifficultyMap = {};
+let wordAdminFiltered = 'unclassified';
+
+function isWordAdmin(user = auth.currentUser) {
+  return !!(user && !user.isAnonymous && user.email && user.email.toLowerCase() === ADMIN_EMAIL && user.emailVerified);
+}
+
+async function loadWordDifficulties() {
+  try {
+    const snap = await db.collection('word_difficulty').get();
+    wordDifficultyMap = {};
+    snap.forEach(doc => { wordDifficultyMap[String(doc.id)] = doc.data().difficulty; });
+    ALL_WORDS.forEach(w => { w.difficulty = wordDifficultyMap[String(w.id)] || w.difficulty || ''; });
+  } catch (e) { console.warn('単語難易度の読み込みに失敗しました。Firestoreルールを確認してください。', e); }
+}
 
 function getRandomDifficultyWords(rangeWords) {
-  return rangeWords.filter(w => {
-    const h = uWordHistory[w.id];
-    const hasUnresolvedMistake = h && (h.wrong || 0) > (h.reviewed || 0);
-    if (randomDifficulty === 'easy') return !!h && (h.solved || 0) > 0 && !hasUnresolvedMistake;
-    if (randomDifficulty === 'hard') return !!hasUnresolvedMistake;
-    // 標準はまだ解答履歴がない単語
-    return !h || (h.solved || 0) === 0;
-  });
+  return rangeWords.filter(w => (w.difficulty || wordDifficultyMap[String(w.id)] || '') === randomDifficulty);
 }
 
 function selectRandomDifficulty(level) {
@@ -1644,6 +1679,96 @@ function openRandomModal() {
   selectRandomDifficulty(randomDifficulty);
   document.getElementById('random-modal').classList.add('open');
 }
+
+
+function updateWordAdminButton(user = auth.currentUser) {
+  const existing = document.getElementById('word-admin-open-btn');
+  if (!isWordAdmin(user)) { if (existing) existing.remove(); return; }
+  if (existing) return;
+  const home = document.getElementById('screen-home');
+  if (!home) return;
+  const btn = document.createElement('button');
+  btn.id = 'word-admin-open-btn';
+  btn.type = 'button';
+  btn.textContent = '🛠️ [管理者] 単語難易度を分類';
+  btn.style.cssText = 'margin-top:10px;padding:10px;background:#455a64;color:white;border-radius:8px;border:none;width:100%;cursor:pointer;font-weight:bold;';
+  btn.onclick = openWordAdmin;
+  home.appendChild(btn);
+}
+
+function openWordAdmin() {
+  if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
+  wordAdminFiltered = 'unclassified';
+  const input = document.getElementById('word-admin-search');
+  if (input) input.value = '';
+  setWordAdminFilter('unclassified');
+  renderWordAdminList();
+  document.getElementById('word-admin-modal').classList.add('open');
+}
+
+function setWordAdminFilter(filter) {
+  wordAdminFiltered = filter;
+  ['unclassified', 'all', 'hard'].forEach(key => {
+    const btn = document.getElementById('word-admin-filter-' + key);
+    if (btn) btn.classList.toggle('selected', key === filter);
+  });
+  renderWordAdminList();
+}
+
+function renderWordAdminList() {
+  const list = document.getElementById('word-admin-list');
+  if (!list) return;
+  const query = (document.getElementById('word-admin-search')?.value || '').trim().toLowerCase();
+  const unclassified = ALL_WORDS.filter(w => !(w.difficulty || wordDifficultyMap[String(w.id)]));
+  const filtered = ALL_WORDS.filter(w => {
+    const d = w.difficulty || wordDifficultyMap[String(w.id)] || '';
+    if (wordAdminFiltered === 'unclassified' && d) return false;
+    if (wordAdminFiltered === 'hard' && d !== 'hard') return false;
+    if (query && !String(w.en || '').toLowerCase().includes(query) && !String(w.jp || '').toLowerCase().includes(query)) return false;
+    return true;
+  }).slice(0, 250);
+  const summary = document.getElementById('word-admin-summary');
+  if (summary) summary.textContent = '分類済み ' + (ALL_WORDS.length - unclassified.length) + ' / ' + ALL_WORDS.length + '語 · 表示 ' + filtered.length + '語（最大250語）';
+  list.innerHTML = '';
+  if (!filtered.length) { list.textContent = '該当する単語がありません。'; return; }
+  filtered.forEach(w => {
+    const row = document.createElement('div'); row.className = 'word-admin-row';
+    const details = document.createElement('div');
+    const en = document.createElement('div'); en.className = 'word-admin-en'; en.textContent = w.en || '（英単語なし）';
+    const jp = document.createElement('div'); jp.className = 'word-admin-jp'; jp.textContent = w.jp || '訳なし';
+    details.append(en, jp);
+    const select = document.createElement('select'); select.className = 'word-admin-select';
+    [['', '未分類'], ['easy', '🟢 基礎'], ['standard', '🔵 標準'], ['hard', '🔴 挑戦']].forEach(pair => {
+      const option = document.createElement('option'); option.value = pair[0]; option.textContent = pair[1]; select.appendChild(option);
+    });
+    select.value = w.difficulty || wordDifficultyMap[String(w.id)] || '';
+    select.disabled = !isWordAdmin();
+    select.addEventListener('change', async () => {
+      if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
+      const difficulty = select.value;
+      select.disabled = true;
+      try {
+        await db.collection('word_difficulty').doc(String(w.id)).set({
+          difficulty: difficulty, wordId: w.id, en: w.en || '', jp: w.jp || '',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedBy: auth.currentUser.email
+        }, { merge: true });
+        if (difficulty) wordDifficultyMap[String(w.id)] = difficulty;
+        else delete wordDifficultyMap[String(w.id)];
+        w.difficulty = difficulty;
+        renderWordAdminList();
+        selectRandomDifficulty(randomDifficulty);
+      } catch (e) {
+        console.error('難易度の保存に失敗しました', e);
+        alert('保存できませんでした。Firestoreの word_difficulty 書き込みルールを確認してください。');
+        select.disabled = false;
+      }
+    });
+    row.append(details, select); list.appendChild(row);
+  });
+}
+
+
 
 function startRoundStudy() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) { alert("⏳ 読み込み中です！"); return; }
@@ -2103,7 +2228,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.0 (単一ランキングDB・範囲別フィールド)"; 
+const APP_VERSION = "v3.1 (単語難易度管理)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
