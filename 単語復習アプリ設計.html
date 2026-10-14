@@ -88,6 +88,25 @@ function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 </script>
 
 <style>
+/* 初期同期中のローディング画面 */
+#sync-loading {
+  position: fixed; inset: 0; z-index: 20000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 24px; background: rgba(253,251,251,.98);
+  color: #264653; text-align: center;
+  transition: opacity .2s ease, visibility .2s ease;
+}
+#sync-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.sync-spinner {
+  width: 46px; height: 46px; border: 4px solid #dce9e7;
+  border-top-color: #2a9d8f; border-radius: 50%;
+  animation: sync-spin .75s linear infinite;
+}
+#sync-loading-title { font-size: 17px; font-weight: 800; }
+#sync-loading-message { color: #6b7b7b; font-size: 13px; line-height: 1.7; }
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-spinner { animation-duration: 1.8s; } }
+
 /* ==========================================
    🌟 1. アプリ全体のモダンUIデザイン
 ========================================== */
@@ -190,6 +209,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
   
   <!-- 右側のグラデーションはログイン画面と同じものを再利用 -->
   <div class="login-right"></div>
+</div>
+
+<!-- 初期同期中は日付や仮の進捗を見せず、同期完了後にホームを表示 -->
+<div id="sync-loading" role="status" aria-live="polite">
+  <div class="sync-spinner" aria-hidden="true"></div>
+  <div id="sync-loading-title">学習データを準備しています</div>
+  <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
 </div>
 
 <!-- 🌟 モダンな2カラムログイン画面 -->
@@ -431,6 +457,19 @@ async function initDictionary() {
   } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
+function showSyncLoading(title, message) {
+  const overlay = document.getElementById('sync-loading');
+  const titleEl = document.getElementById('sync-loading-title');
+  const messageEl = document.getElementById('sync-loading-message');
+  if (titleEl && title) titleEl.textContent = title;
+  if (messageEl && message) messageEl.textContent = message;
+  if (overlay) overlay.classList.remove('is-hidden');
+}
+function hideSyncLoading() {
+  const overlay = document.getElementById('sync-loading');
+  if (overlay) overlay.classList.add('is-hidden');
+}
+
 // 🚀 画面ロード時の処理（テスト日・範囲、個人の周回データをクラウドから完全同期）
 window.onload = () => {
   console.log("🚀 アプリ初期化開始...");
@@ -446,6 +485,8 @@ window.onload = () => {
     const appContainer = document.getElementById('app-container');
 
     if (isLine) {
+      hideSyncLoading();
+
       // 【パターンA：LINEの場合】警告画面だけを強制表示！アプリもログインも絶対隠す
       if (lineWarningScreen) lineWarningScreen.style.display = 'flex';
       if (loginScreen) loginScreen.style.display = 'none';
@@ -457,66 +498,65 @@ window.onload = () => {
     if (lineWarningScreen) lineWarningScreen.style.display = 'none';
 
     if (user) {
-      // ✅ 【パターンB：ログイン済みの場合】アプリ本体を表示
+      // ログイン済み：同期が終わるまでローディングを重ねて仮の進捗を隠す
+      showSyncLoading('学習データを同期しています', '単語・テスト日・あなたの学習進捗を読み込んでいます。');
       if (loginScreen) loginScreen.style.display = 'none';
       if (appContainer) appContainer.style.display = 'block';
-      
-      await initDictionary();
-      
-      // 1. クラス共通の目標日時と範囲を取得
-      try {
-        const targetDoc = await db.collection('vocabulary').doc('active_test').get();
-        if (targetDoc.exists) {
-          const config = targetDoc.data();
-          if (config.testDate) testDate = new Date(config.testDate);
-        }
-      } catch(e) { console.error("共通目標の取得に失敗:", e); }
 
-      // 🌟 テスト範囲は「自分で選んだ範囲」（未選択なら今回の範囲＝2学期中間）。範囲に決まった日時があればそれを使う
+      // 独立したFirestore読み込みを並列実行し、待ち時間を短縮
       activeRange = getSavedRange();
-      const rangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
-      if (rangeOpt && rangeOpt.testDate) testDate = new Date(rangeOpt.testDate);
-      
-      // 2. ユーザー個人の【周回進捗データ】を完全読み込み（🔥休み明けテスト対応版！）
-      try {
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
+      const targetDatePromise = db.collection('vocabulary').doc('active_test').get()
+        .catch(e => { console.error('共通目標の取得に失敗:', e); return null; });
+      const userDocPromise = db.collection('users').doc(user.uid).get()
+        .catch(e => { console.error('ユーザーデータ取得エラー:', e); return null; });
+
+      await Promise.all([
+        initDictionary(),
+        targetDatePromise.then(targetDoc => {
+          if (targetDoc && targetDoc.exists) {
+            const config = targetDoc.data();
+            if (config.testDate) testDate = new Date(config.testDate);
+          }
+        }),
+        userDocPromise.then(userDoc => {
+          if (!userDoc || !userDoc.exists) return;
           const data = userDoc.data();
           if (data.nickname) currentNickname = data.nickname;
-          
-          // 🔥 休み明けテスト(extra)が選ばれているなら、専用の白紙セーブデータを読み込む！
-          if (rangeSuffix() !== '') {
-            const sfx = rangeSuffix();
+          const sfx = rangeSuffix();
+          if (sfx !== '') {
             uCurrentRound = data['currentRound' + sfx] || 1;
             uRoundAnswers = data['roundAnswers' + sfx] || [];
             uTotalAnswers = data['totalAnswers' + sfx] || 0;
             uTotalCorrect = data['totalCorrect' + sfx] || 0;
             uWordHistory = data['wordHistory' + sfx] || {};
           } else {
-            // 中間や期末の場合は、これまでの過去のセーブデータをそのままロード
             if (data.currentRound !== undefined) uCurrentRound = data.currentRound;
-            if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers; 
+            if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers;
             if (data.totalAnswers !== undefined) uTotalAnswers = data.totalAnswers;
-            if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect; 
+            if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect;
             if (data.wordHistory !== undefined) uWordHistory = data.wordHistory;
           }
-        }
-      } catch(e) { console.error("ユーザーデータ取得エラー:", e); }
+        })
+      ]);
+
+      // 選択中の範囲に固有のテスト日があれば共通設定より優先
+      const rangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
+      if (rangeOpt && rangeOpt.testDate) testDate = new Date(rangeOpt.testDate);
 
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `👤 ${currentNickname || user.displayName || user.email}`;
-      if (typeof isGuest !== 'undefined' && !isGuest) {
-        const btnEdit = document.getElementById('btn-edit-nickname');
-        if(btnEdit) btnEdit.style.display = 'block';
-      }
+      const btnEdit = document.getElementById('btn-edit-nickname');
+      if (btnEdit && !isGuest) btnEdit.style.display = 'block';
 
       startCountdown();
-      refreshUI(); // 🌟 ホーム画面の表示を最新状態に更新
+      refreshUI();
+      hideSyncLoading();
 
     } else if (typeof isGuest !== 'undefined' && !isGuest) {
-      // ❌ 【パターンC：未ログインの場合】ログイン画面を表示
+      // 未ログインならログイン画面へ。ローディングを解除して操作可能にする
       if (loginScreen) loginScreen.style.display = 'flex';
       if (appContainer) appContainer.style.display = 'none';
+      hideSyncLoading();
     }
   });
 };
@@ -1065,9 +1105,12 @@ function getActiveRangeInfo() {
 // ☁️ Firebaseから単語を読み込むだけの超スッキリ版！
 async function initDictionary() {
   try {
-    const midDoc = await db.collection('vocabulary').doc('midterm').get();
-    const finDoc = await db.collection('vocabulary').doc('final').get();
-    const extDoc = await db.collection('vocabulary').doc('extra').get();
+    // 3つの範囲データを並列取得
+    const [midDoc, finDoc, extDoc] = await Promise.all([
+      db.collection('vocabulary').doc('midterm').get(),
+      db.collection('vocabulary').doc('final').get(),
+      db.collection('vocabulary').doc('extra').get()
+    ]);
 
     let midWords = [], finWords = [], extWords = [];
     if (midDoc.exists) midWords = midDoc.data().words;
