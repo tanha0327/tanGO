@@ -1194,11 +1194,13 @@ function renderQuestion() {
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
   if (w.sentence) {
-    // 📝 文章題：英文の空所に入る単語を答える
+    // 📝 文章題：空所に入る単語の最初の1文字をヒントとして表示
+    const initial = String(w.en || '').trim().charAt(0);
+    const sentencePrompt = String(w.sentence).replace(/\(\s*____\s*\)/g, '(' + initial + '____)');
     document.getElementById('quiz-word').innerHTML =
-      `<div style="font-size:20px;line-height:1.6;font-weight:600;">${escHtml(w.sentence)}</div>` +
+      `<div style="font-size:20px;line-height:1.6;font-weight:600;">${escHtml(sentencePrompt)}</div>` +
       `<div style="font-size:14px;line-height:1.5;color:#666;margin-top:10px;font-weight:400;">${escHtml(w.sentenceJp || '')}</div>`;
-    document.getElementById('quiz-hint').textContent = `No.${w.id} — ( ____ ) に入る英単語を答えてください`;
+    document.getElementById('quiz-hint').textContent = `No.${w.id} — ( ${initial}____ ) に入る英単語を答えてください`;
   } else {
     document.getElementById('quiz-word').textContent = w.jp;
     document.getElementById('quiz-hint').textContent = `No.${w.id} — 英語で答えてください`;
@@ -2630,7 +2632,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.8 (単語ランキング描画修正)"; 
+const APP_VERSION = "v3.9 (2学期中間の頭文字ヒント)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
