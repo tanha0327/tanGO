@@ -614,7 +614,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       <div class="card">
         <div id="quiz-word" class="quiz-word"></div>
         <div id="quiz-hint" class="quiz-hint"></div>
-        <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();if(questionAnswered){nextQuestion()}else{submitAnswer()}}"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
+        <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
         <div id="quiz-result" style="display:none;margin-top:12px;"></div>
         <button class="big-btn btn-primary" id="btn-next-question" style="display:none;margin-top:12px;" onclick="event.stopPropagation();nextQuestion()">次の問題へ ↵</button>
       </div>
@@ -1201,45 +1201,48 @@ if (!window.__tangoQuizTapHandlerInstalled) {
     handleQuizTap(event);
   }, true);
 }
-// 解答欄からフォーカスが外れていても、Enterキーで回答・次の問題へ進める。
+// Enterキーは押した瞬間に1回だけ処理する。長押し(repeat)やkeyupでの二重実行を防ぐ。
 if (!window.__tangoQuizEnterHandlerInstalled) {
   window.__tangoQuizEnterHandlerInstalled = true;
+  window.__tangoEnterKeyIsDown = false;
+
   document.addEventListener('keydown', event => {
     if (event.key !== 'Enter') return;
     const quizScreen = document.getElementById('screen-quiz');
     if (!quizScreen || !quizScreen.classList.contains('visible')) return;
     if (document.getElementById('word-admin-modal')?.classList.contains('open')) return;
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    // 解答後はIMEの状態にかかわらずEnterで次の問題へ。
-    if (questionAnswered) {
+
+    // 長押しによる連続keydownは無視する。
+    if (event.repeat || window.__tangoEnterKeyIsDown) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      nextQuestion();
       return;
     }
-    // 解答前は日本語入力の変換確定Enterを送信扱いにしない。
-    if (event.isComposing || event.keyCode === 229) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    submitAnswer();
-  }, true);
-}
-// keydownがブラウザや入力方式に拾われなかった場合の保険。
-// 解答後のEnterだけをkeyupでも受け取り、回答前の入力には干渉しない。
-if (!window.__tangoQuizEnterKeyupInstalled) {
-  window.__tangoQuizEnterKeyupInstalled = true;
-  document.addEventListener('keyup', event => {
-    if (event.key !== 'Enter' || !questionAnswered) return;
-    const quizScreen = document.getElementById('screen-quiz');
-    if (!quizScreen || !quizScreen.classList.contains('visible')) return;
-    if (document.getElementById('word-admin-modal')?.classList.contains('open')) return;
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    nextQuestion();
-  }, true);
-}
+    window.__tangoEnterKeyIsDown = true;
 
+    // 回答前、日本語入力の変換確定中のEnterは送信しない。
+    if (!questionAnswered && (event.isComposing || event.keyCode === 229)) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (questionAnswered) {
+      nextQuestion();
+    } else {
+      submitAnswer();
+    }
+  }, true);
+
+  // キーを離す操作では進めず、ロックだけ解除する。
+  document.addEventListener('keyup', event => {
+    if (event.key === 'Enter') window.__tangoEnterKeyIsDown = false;
+  }, true);
+
+  // ウィンドウ外でキーを離したケースにも対応。
+  window.addEventListener('blur', () => {
+    window.__tangoEnterKeyIsDown = false;
+  });
+}
 function nextQuestion() {
   if (!questionAnswered) return;
   const nextBtn = document.getElementById('btn-next-question');
@@ -2384,7 +2387,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.3 (Enterキー修正)"; 
+const APP_VERSION = "v3.4 (Enter連続入力防止)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
