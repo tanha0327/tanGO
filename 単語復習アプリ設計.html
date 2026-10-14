@@ -221,9 +221,9 @@ function updateRangeButton() {
   const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `👑 ${rn} 進捗トップ3 (タップで詳細)`;
   const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `🏆 ${rn} 進捗ランキング`;
   btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\S+\s*/, '') : ''}（タップで変更）`;
-  // re特訓ボタンは2学期中間モードのときだけ表示
-  const reBtn = document.getElementById('btn-re-practice');
-  if (reBtn) reBtn.style.display = activeRange === 't2mid' ? 'block' : 'none';
+  // re特訓カードは2学期中間モードのときだけ表示
+  const reCard = document.getElementById('practice-re-card');
+  if (reCard) reCard.style.display = activeRange === 't2mid' ? 'block' : 'none';
 }
 
 function startReWordPractice() {
@@ -282,6 +282,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 .app { max-width: 480px; margin: 0 auto; padding: 2rem 1.2rem; }
 .screen { display: none; }
 .screen.visible { display: block; }
+.app { padding-bottom: 96px; }
+.bottom-nav {
+  position: fixed; z-index: 50; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: min(100%, 480px); display: none; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(253,251,251,.96); border-top: 1px solid #e8e8e8; backdrop-filter: blur(12px);
+}
+.bottom-nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  padding: 8px; border: 0; border-radius: 12px; background: transparent; color: #777;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.bottom-nav-item span:first-child { font-size: 19px; line-height: 1.2; }
+.bottom-nav-item.active { color: #21867a; background: rgba(42,157,143,.10); }
+html.dark-mode .bottom-nav { background: rgba(17,24,32,.96); border-color: #344352; }
+html.dark-mode .bottom-nav-item { color: #aab7c4; }
+html.dark-mode .bottom-nav-item.active { color: #70d9cb; background: rgba(42,157,143,.18); }
+
 .card { background: white; border: none; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.2rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04); }
 .label { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;}
 .option-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
@@ -631,7 +648,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       </div>
       
       <button id="btn-range-select" class="big-btn btn-secondary" style="margin-bottom:10px; font-weight:700;" onclick="openRangeModal()">📚 テスト範囲を選ぶ</button>
-      <button id="btn-re-practice" class="big-btn btn-primary" style="display:none; margin-bottom:10px; font-weight:700;" onclick="startReWordPractice()">🔤 reで始まる単語だけ練習</button>
+      
 
       <div class="countdown-card" id="countdown-card">
         <div style="font-size:10px; opacity:0.8; margin-bottom:4px;" id="countdown-label">テスト日を設定してください</div>
@@ -686,6 +703,45 @@ window.__tangoInitialWatchdog = setTimeout(() => {
         <button class="big-btn btn-primary" style="padding: 15px; font-size: 16px; font-weight: 700; box-shadow: 0 4px 12px rgba(45,125,210,0.3);" id="btn-main-study" onclick="startRoundStudy()">🚀 1周目をスタート</button>
       </div>
     </div>
+
+    <div class="screen" id="screen-practice">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;">
+        <div style="font-size:28px;">🏋️</div>
+        <div>
+          <div style="font-size:22px;font-weight:800;">特訓メニュー</div>
+          <div style="font-size:12px;color:#888;margin-top:4px;">選択中のテスト範囲に合わせて練習</div>
+        </div>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="startReWordPractice()" id="practice-re-card">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px;">🔤</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;margin-bottom:5px;">reで始まる単語</div>
+            <div style="font-size:12px;color:#888;">2学期中間（文章題）の範囲限定</div>
+          </div>
+          <div style="font-size:22px;color:#888;">›</div>
+        </div>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="startReviewMode()">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px;">🔁</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;margin-bottom:5px;">間違えた単語の復習</div>
+            <div style="font-size:12px;color:#888;">要復習になっている単語をまとめて出題</div>
+          </div>
+          <div style="font-size:22px;color:#888;">›</div>
+        </div>
+      </div>
+    </div>
+
+    <nav id="bottom-nav" class="bottom-nav" aria-label="メインメニュー">
+      <button type="button" class="bottom-nav-item active" id="nav-home" onclick="showScreen('screen-home')">
+        <span>🏠</span><span>ホーム</span>
+      </button>
+      <button type="button" class="bottom-nav-item" id="nav-practice" onclick="showScreen('screen-practice')">
+        <span>🏋️</span><span>特訓</span>
+      </button>
+    </nav>
 
     <div class="screen" id="screen-quiz">
       <div class="quiz-header">
@@ -974,7 +1030,16 @@ if (document.readyState === 'loading') {
 function showScreen(id) {
   stopQuestionTimer();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
-  document.getElementById(id).classList.add('visible');
+  const target = document.getElementById(id);
+  if (target) target.classList.add('visible');
+
+  const nav = document.getElementById('bottom-nav');
+  const onMainTab = id === 'screen-home' || id === 'screen-practice';
+  if (nav) nav.style.display = onMainTab ? 'flex' : 'none';
+  const homeTab = document.getElementById('nav-home');
+  const practiceTab = document.getElementById('nav-practice');
+  if (homeTab) homeTab.classList.toggle('active', id === 'screen-home');
+  if (practiceTab) practiceTab.classList.toggle('active', id === 'screen-practice');
 }
 
 // 📊 画面表示を最新データで再計算して書き換える関数
