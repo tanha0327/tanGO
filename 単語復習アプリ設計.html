@@ -54,6 +54,32 @@ const state = { queue: [], current: 0, results: [] };
 // 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
 function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : ''); }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
+// 🌟 テスト範囲の選択肢（ユーザーごとに端末へ記憶。初期値は今回の範囲＝2学期中間）
+const RANGE_OPTIONS = [
+  { key: 't2mid',   label: '📝 2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00' },
+  { key: 'extra',   label: '🏖️ 休み明け',           sub: 'DB3300 1633〜1968' },
+  { key: 'final',   label: '🎯 一学期期末',          sub: 'DB3300 1542〜1683' },
+  { key: 'midterm', label: '🔙 一学期中間',          sub: 'DB3300 1401〜1541' },
+];
+const DEFAULT_RANGE = 't2mid';
+function getSavedRange() {
+  try { const v = localStorage.getItem('tango_selected_range'); if (RANGE_OPTIONS.some(o => o.key === v)) return v; } catch (e) {}
+  return DEFAULT_RANGE;
+}
+function openRangeModal() {
+  const box = document.getElementById('range-options');
+  box.innerHTML = RANGE_OPTIONS.map(o => `<button class="big-btn ${o.key === activeRange ? 'btn-primary' : 'btn-secondary'}" style="text-align:left;" onclick="selectRange('${o.key}')">${o.label}<br><span style="font-size:11px;font-weight:400;opacity:0.85;">${o.sub}${o.key === activeRange ? '　✔ 選択中' : ''}</span></button>`).join('');
+  document.getElementById('range-modal').classList.add('open');
+}
+function selectRange(key) {
+  try { localStorage.setItem('tango_selected_range', key); } catch (e) {}
+  window.location.reload(); // 範囲ごとに進捗・ランキングが変わるので、読み込み直して切り替える
+}
+function updateRangeButton() {
+  const btn = document.getElementById('btn-range-select'); if (!btn) return;
+  const o = RANGE_OPTIONS.find(x => x.key === activeRange);
+  btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\S+\s*/, '') : ''}（タップで変更）`;
+}
 function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 </script>
@@ -243,6 +269,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
     </div>
   </div>
 
+  <div class="modal-overlay" id="range-modal">
+    <div class="modal-box">
+      <div class="modal-title">📚 テスト範囲を選ぶ</div>
+      <div style="font-size:12px; color:#666; text-align:center; margin-bottom:12px;">範囲ごとに進捗・ランキングが別々に記録されます</div>
+      <div id="range-options" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div class="modal-btns" style="margin-top:16px;">
+        <button class="big-btn btn-secondary" style="grid-column: span 2;" onclick="document.getElementById('range-modal').classList.remove('open')">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="testdate-modal">
     <div class="modal-box">
       <div class="modal-title">📅 クラス共通の目標設定</div>
@@ -281,6 +318,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
         <button class="exit-btn" onclick="logout()">🔓 ログアウト</button>
       </div>
       
+      <button id="btn-range-select" class="big-btn btn-secondary" style="margin-bottom:10px; font-weight:700;" onclick="openRangeModal()">📚 テスト範囲を選ぶ</button>
+
       <div class="countdown-card" id="countdown-card">
         <div style="font-size:10px; opacity:0.8; margin-bottom:4px;" id="countdown-label">テスト日を設定してください</div>
         <div style="display:flex; justify-content:center; align-items:baseline;">
@@ -428,9 +467,13 @@ window.onload = () => {
         if (targetDoc.exists) {
           const config = targetDoc.data();
           if (config.testDate) testDate = new Date(config.testDate);
-          if (config.activeRange) activeRange = config.activeRange;
         }
       } catch(e) { console.error("共通目標の取得に失敗:", e); }
+
+      // 🌟 テスト範囲は「自分で選んだ範囲」（未選択なら今回の範囲＝2学期中間）。範囲に決まった日時があればそれを使う
+      activeRange = getSavedRange();
+      const rangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
+      if (rangeOpt && rangeOpt.testDate) testDate = new Date(rangeOpt.testDate);
       
       // 2. ユーザー個人の【周回進捗データ】を完全読み込み（🔥休み明けテスト対応版！）
       try {
@@ -1048,6 +1091,7 @@ async function initDictionary() {
 
 
 function refreshUI() {
+  updateRangeButton();
   const info = getActiveRangeInfo();
   if (info.total === 0) return;
 
@@ -1282,12 +1326,6 @@ window.addEventListener('DOMContentLoaded', () => {
     };
     adminBtn.parentNode.insertBefore(btn, adminBtn.nextSibling);
 
-    // 📝 2学期中間テスト(文章題 1684〜1826)を全員にセット
-    const btn2 = document.createElement('button');
-    btn2.textContent = "⚙️ [管理者] 2学期中間(文章題 1684〜1826・10/15 9:10)を全員にセット";
-    btn2.style = "margin-top:10px; padding:8px; background:#7b1fa2; color:white; border-radius:8px; border:none; width:100%; cursor:pointer; font-weight:bold;";
-    btn2.onclick = () => { setAndSaveSharedTest("2学期中間テスト(文章題) 10/15 9:10", new Date("2026-10-15T09:10:00").toISOString(), 't2mid'); };
-    btn.parentNode.insertBefore(btn2, btn.nextSibling);
   }
 });
 
@@ -1296,7 +1334,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.2 (2学期中間 文章題版)"; 
+const APP_VERSION = "v2.3 (範囲選択・2学期中間文章題)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
