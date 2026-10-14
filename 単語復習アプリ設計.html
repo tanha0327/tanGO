@@ -1780,7 +1780,7 @@ async function setWordAdminDifficulty(word, difficulty, buttons) {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedBy: auth.currentUser.email
     }, { merge: true });
-    wordDifficultyMap[docId.replace(':', ':')] = difficulty;
+    wordDifficultyMap[docId] = difficulty;
     renderWordAdminList();
     selectRandomDifficulty(randomDifficulty);
   } catch (e) {
