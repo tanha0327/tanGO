@@ -277,6 +277,23 @@ function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 @keyframes sync-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .sync-spinner { animation-duration: 1.8s; } }
 
+/* iPhoneの入力中は問題画面をコンパクトにして、キーボードに隠れにくくする */
+#screen-quiz .progress-wrap { margin-bottom: 12px; }
+#screen-quiz .card { padding: 16px !important; }
+#screen-quiz .quiz-word { padding: 10px 6px 4px; font-size: clamp(23px, 6vw, 30px); line-height: 1.35; }
+#screen-quiz .quiz-hint { margin-bottom: 12px; line-height: 1.4; }
+#screen-quiz .quiz-answer-row { margin-top: 10px; }
+#screen-quiz #quiz-tap-hint { margin-top: 10px !important; line-height: 1.45; }
+#screen-quiz .quiz-header { margin-bottom: 8px; }
+#screen-quiz .progress-wrap { margin-bottom: 12px; }
+@media (max-height: 650px) {
+  #screen-quiz .card { padding: 12px !important; }
+  #screen-quiz .quiz-word { padding-top: 4px; font-size: 23px; }
+  #screen-quiz .quiz-hint { margin-bottom: 8px; font-size: 12px; }
+  #screen-quiz .text-input { padding: 12px; }
+  #screen-quiz #quiz-tap-hint { font-size: 11px !important; }
+}
+
 /* ==========================================
    🌟 1. アプリ全体のモダンUIデザイン
 ========================================== */
@@ -2851,7 +2868,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v4.7 (iPhoneキーボード表示時の位置調整)"; 
+const APP_VERSION = "v4.8 (問題画面の縦余白を縮小)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
