@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <!-- 超高画質＆滑らかな Lottie アニメーションライブラリ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
-<script src="sentences-t2mid.js"></script>
+<!-- sentences-t2mid.js は initDictionary() から必要時に非同期読み込み -->
 <script>
 // ==========================================
 // Firebase設定
@@ -54,6 +54,71 @@ const state = { queue: [], current: 0, results: [] };
 // 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
 function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : '')); }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
+
+// 文章題データは起動を止めないよう、必要時に非同期で読み込む
+function loadT2MidSentenceData(timeoutMs = 4000) {
+  if (Array.isArray(window.SENTENCES_T2MID) && window.SENTENCES_T2MID.length) return Promise.resolve(true);
+  if (window.__tangoSentenceLoadPromise) return window.__tangoSentenceLoadPromise;
+
+  window.__tangoSentenceLoadPromise = new Promise(resolve => {
+    let settled = false;
+    let timer = null;
+    const script = document.createElement('script');
+    script.src = new URL('sentences-t2mid.js', document.baseURI).href;
+    script.async = true;
+    const finish = ok => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(Boolean(ok && Array.isArray(window.SENTENCES_T2MID) && window.SENTENCES_T2MID.length));
+    };
+    script.onload = () => finish(true);
+    script.onerror = () => finish(false);
+    timer = setTimeout(() => finish(false), timeoutMs);
+    document.head.appendChild(script);
+  }).then(loaded => {
+    if (Array.isArray(window.SENTENCES_T2MID) && window.SENTENCES_T2MID.length) loaded = true;
+    if (loaded && Array.isArray(window.SENTENCES_T2MID)) {
+      try { localStorage.setItem('tango_t2mid_sentences_cache_v1', JSON.stringify(window.SENTENCES_T2MID)); } catch (e) {}
+      return true;
+    }
+    try {
+      const cached = JSON.parse(localStorage.getItem('tango_t2mid_sentences_cache_v1') || 'null');
+      if (Array.isArray(cached) && cached.length) {
+        window.SENTENCES_T2MID = cached;
+        return true;
+      }
+    } catch (e) {}
+    window.__tangoSentenceLoadPromise = null;
+    return false;
+  });
+  return window.__tangoSentenceLoadPromise;
+}
+
+// Firestoreが応答しない場合も、画面初期化を無期限に待たせない
+function withTimeoutFallback(promise, timeoutMs, fallbackValue, label) {
+  return new Promise(resolve => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      console.warn(label + ' がタイムアウトしました。');
+      resolve(fallbackValue);
+    }, timeoutMs);
+    Promise.resolve(promise).then(value => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    }, error => {
+      console.error(label + ' に失敗:', error);
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(fallbackValue);
+    });
+  });
+}
 // 🌟 テスト範囲の選択肢（ユーザーごとに端末へ記憶。初期値は今回の範囲＝2学期中間）
 const RANGE_OPTIONS = [
   { key: 't2mid',   label: '📝 2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00' },
@@ -234,6 +299,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
   <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
   <button id="sync-retry-btn" onclick="window.location.reload()" style="display:none;padding:10px 18px;border:0;border-radius:10px;background:#2a9d8f;color:white;font-weight:700;">再読み込みして再試行</button>
 </div>
+
+<script>
+// アプリ本体の初期化が動かなかった場合も、初期ローディングを永久表示にしない
+window.__tangoAppReady = false;
+window.__tangoInitialWatchdog = setTimeout(() => {
+  if (window.__tangoAppReady) return;
+  const overlay = document.getElementById('sync-loading');
+  if (!overlay || overlay.classList.contains('is-hidden')) return;
+  const title = document.getElementById('sync-loading-title');
+  const message = document.getElementById('sync-loading-message');
+  const retry = document.getElementById('sync-retry-btn');
+  if (title) title.textContent = 'アプリの起動に時間がかかっています';
+  if (message) message.textContent = '初期化またはFirebaseの応答が止まっている可能性があります。再読み込みしてもう一度お試しください。';
+  if (retry) retry.style.display = 'inline-block';
+}, 12000);
+</script>
 
 <!-- 🌟 モダンな2カラムログイン画面 -->
 <div id="login-screen" class="modern-login-screen">
@@ -507,11 +588,13 @@ function showSyncLoading(title, message) {
 function hideSyncLoading() {
   const overlay = document.getElementById('sync-loading');
   if (syncWatchdog) { clearTimeout(syncWatchdog); syncWatchdog = null; }
+  if (window.__tangoInitialWatchdog) { clearTimeout(window.__tangoInitialWatchdog); window.__tangoInitialWatchdog = null; }
+  window.__tangoAppReady = true;
   if (overlay) overlay.classList.add('is-hidden');
 }
 
 // 🚀 画面ロード時の処理（テスト日・範囲、個人の周回データをクラウドから完全同期）
-document.addEventListener('DOMContentLoaded', () => {
+function startTangoAuthListener() {
   console.log("🚀 アプリ初期化開始...");
 
   // window.load は外部画像・アニメーション素材の読み込み待ちで遅れることがあるため、
@@ -562,10 +645,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 独立したFirestore読み込みを並列実行し、待ち時間を短縮
       activeRange = getSavedRange();
-      const targetDatePromise = db.collection('vocabulary').doc('active_test').get()
-        .catch(e => { console.error('共通目標の取得に失敗:', e); return null; });
-      const userDocPromise = db.collection('users').doc(user.uid).get()
-        .catch(e => { console.error('ユーザーデータ取得エラー:', e); return null; });
+      const targetDatePromise = withTimeoutFallback(
+        db.collection('vocabulary').doc('active_test').get(),
+        4500, null, '共通目標の取得'
+      ).catch(e => { console.error('共通目標の取得に失敗:', e); return null; });
+      const userDocPromise = withTimeoutFallback(
+        db.collection('users').doc(user.uid).get(),
+        4500, null, 'ユーザーデータ取得'
+      ).catch(e => { console.error('ユーザーデータ取得エラー:', e); return null; });
 
       await Promise.all([
         initDictionary(),
@@ -626,7 +713,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (messageEl) messageEl.textContent = 'Firebaseへの接続に失敗しました。通信を確認して再読み込みしてください。';
     if (retryBtn) retryBtn.style.display = 'inline-block';
   });
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startTangoAuthListener, { once: true });
+} else {
+  startTangoAuthListener();
+}
 
 function showScreen(id) {
   stopQuestionTimer();
@@ -1281,35 +1373,76 @@ function getActiveRangeInfo() {
 
 // ☁️ Firebaseから単語を読み込むだけの超スッキリ版！
 async function initDictionary() {
-  try {
-    // 3つの範囲データを並列取得
-    const [midDoc, finDoc, extDoc] = await Promise.all([
-      db.collection('vocabulary').doc('midterm').get(),
-      db.collection('vocabulary').doc('final').get(),
-      db.collection('vocabulary').doc('extra').get()
-    ]);
+  // 文章題スクリプトとFirestoreを並列で読み込み、どちらかの応答待ちで永久停止しない
+  const sentencePromise = loadT2MidSentenceData(4000);
+  const cloudPromise = Promise.all([
+    db.collection('vocabulary').doc('midterm').get(),
+    db.collection('vocabulary').doc('final').get(),
+    db.collection('vocabulary').doc('extra').get()
+  ]).then(([midDoc, finDoc, extDoc]) => {
+    const data = {
+      midWords: midDoc.exists && Array.isArray(midDoc.data().words) ? midDoc.data().words : [],
+      finWords: finDoc.exists && Array.isArray(finDoc.data().words) ? finDoc.data().words : [],
+      extWords: extDoc.exists && Array.isArray(extDoc.data().words) ? extDoc.data().words : []
+    };
+    try { localStorage.setItem('tango_vocabulary_cache_v1', JSON.stringify(data)); } catch (e) {}
+    return data;
+  }).catch(e => {
+    console.error('Firestore単語データ取得エラー:', e);
+    return null;
+  });
 
-    let midWords = [], finWords = [], extWords = [];
-    if (midDoc.exists) midWords = midDoc.data().words;
-    if (finDoc.exists) finWords = finDoc.data().words;
-    if (extDoc.exists) extWords = extDoc.data().words;
+  let cloudData = await withTimeoutFallback(cloudPromise, 5000, null, 'Firestore単語データ');
+  const sentenceLoaded = await sentencePromise;
 
-    // Firebaseから取ってきた単語をすべて合体！
-    ALL_WORDS = [...midWords, ...finWords, ...extWords];
+  const hasCloudWords = data => data && (
+    (Array.isArray(data.midWords) && data.midWords.length) ||
+    (Array.isArray(data.finWords) && data.finWords.length) ||
+    (Array.isArray(data.extWords) && data.extWords.length)
+  );
+  if (!hasCloudWords(cloudData)) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('tango_vocabulary_cache_v1') || 'null');
+      if (hasCloudWords(cached)) {
+        cloudData = cached;
+        console.warn('Firestoreの代わりに端末に保存された単語データを使います。');
+      }
+    } catch (e) {}
+  }
 
-    // 🌟 2学期中間(文章題)：コード側のデータを末尾に追加。意味(jp)は同じ番号の単語があれば流用
-    T2MID_LO = ALL_WORDS.length;
-    const jpById = {}; ALL_WORDS.forEach(w => { if (w.jp) jpById[w.id] = w.jp; });
-    (window.SENTENCES_T2MID || []).forEach(x => ALL_WORDS.push({ id: x.id, en: x.en, jp: jpById[x.id] || '', sentence: x.sentence, sentenceJp: x.sentenceJp }));
-    
-    // 🌟 記号のお掃除（Firebaseから読み込んだ後に自動実行）
-    ALL_WORDS.forEach(w => {
-      w.en = w.en.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/〈.*?〉/g, 'someone ').replace(/[…～~・\.]/g, '').replace(/\s+/g, ' ').trim();
-    });
-    console.log("☁️ 3種類の単語データをFirebaseから読み込み完了！");
-  } catch(e) { console.error("単語DB初期化エラー:", e); }
+  const midWords = cloudData && Array.isArray(cloudData.midWords) ? cloudData.midWords : [];
+  const finWords = cloudData && Array.isArray(cloudData.finWords) ? cloudData.finWords : [];
+  const extWords = cloudData && Array.isArray(cloudData.extWords) ? cloudData.extWords : [];
+  ALL_WORDS = [...midWords, ...finWords, ...extWords];
+
+  // 二学期中間の文章題は専用JSから読み込むためFirestoreには依存しない
+  T2MID_LO = ALL_WORDS.length;
+  const sentences = Array.isArray(window.SENTENCES_T2MID) ? window.SENTENCES_T2MID : [];
+  const jpById = {};
+  ALL_WORDS.forEach(w => { if (w.jp) jpById[w.id] = w.jp; });
+  sentences.forEach(x => ALL_WORDS.push({
+    id: x.id, en: x.en, jp: jpById[x.id] || '', sentence: x.sentence, sentenceJp: x.sentenceJp
+  }));
+
+  ALL_WORDS.forEach(w => {
+    w.en = String(w.en || '').replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '')
+      .replace(/〈.*?〉/g, 'someone ').replace(/[…～~・\.]/g, '')
+      .replace(/\s+/g, ' ').trim();
+  });
+
+  // 文章題だけが読み込めず、他範囲のデータがある場合は使える範囲へ切り替える
+  if (activeRange === 't2mid' && sentences.length === 0) {
+    if (finWords.length) activeRange = 'final';
+    else if (midWords.length) activeRange = 'midterm';
+    window.__tangoSentenceLoadFailed = true;
+  }
+  if (ALL_WORDS.length === 0) {
+    window.__tangoDictionaryUnavailable = true;
+    console.error('利用可能な単語データがありません。通信またはFirestore設定を確認してください。');
+  }
+  if (!sentenceLoaded && sentences.length === 0) console.warn('文章題データは未読込です。');
+  console.log('単語データ読み込み処理が終了しました。単語数:', ALL_WORDS.length);
 }
-
 
 
 function refreshUI() {
@@ -1828,7 +1961,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.6 (ゲスト学習・演習レポート)"; 
+const APP_VERSION = "v2.7 (起動待ち対策)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
