@@ -889,7 +889,7 @@ function revealAnswer() {
 }
 function handleQuizTap(event) {
   if (!questionAnswered) return;
-  if (event.target.closest("button, input, .modal-box, .exit-btn")) return;
+  if (event.target.closest(".exit-btn, .modal-box")) return;
   nextQuestion();
 }
 function nextQuestion() {
@@ -1494,6 +1494,19 @@ async function saveNickname() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  // スマホでキーボードを開いた際、ブラウザがページを勝手にスクロールするのを抑える。
+  const answerInput = document.getElementById("quiz-answer");
+  let quizScrollY = 0;
+  if (answerInput) {
+    answerInput.addEventListener("focus", () => {
+      quizScrollY = window.scrollY;
+      requestAnimationFrame(() => window.scrollTo(0, quizScrollY));
+      setTimeout(() => window.scrollTo(0, quizScrollY), 80);
+    });
+    window.addEventListener("resize", () => {
+      if (document.activeElement === answerInput) window.scrollTo(0, quizScrollY);
+    });
+  }
   const adminBtn = document.querySelector('button[onclick="openTestDateModal()"]');
   if (adminBtn) {
     const btn = document.createElement('button');
