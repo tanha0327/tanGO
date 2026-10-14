@@ -1029,6 +1029,8 @@ function updateLeaderboardDisplay(forceRefresh = false) {
 function openLeaderboardModal() {
   document.getElementById('leaderboard-modal').classList.add('open');
   const boardEl = document.getElementById('leaderboard-content-full');
+  const cachedAt = Number(boardEl.dataset.loadedAt || 0);
+  if (cachedAt && Date.now() - cachedAt < 60000 && boardEl.innerHTML.trim()) return;
   boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
   
   db.collection('leaderboard').orderBy('progressPercent', 'desc').limit(10).get().then(snapshot => {
@@ -1050,6 +1052,10 @@ function openLeaderboardModal() {
         </div>
       </div>`;
     }).join('');
+    boardEl.dataset.loadedAt = String(Date.now());
+  }).catch(e => {
+    console.error('ランキング全体の取得エラー:', e);
+    boardEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">ランキングを読み込めませんでした。通信を確認して再度開いてください。</div>';
   });
 }
 
