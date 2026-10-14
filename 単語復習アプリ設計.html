@@ -47,6 +47,9 @@ let uCurrentRound = 1;      // 現在何周目か
 let uRoundAnswers = [];     // 現在の周回で既に解いた単語IDのリスト
 let uTotalAnswers = 0;      // 通算解答数（正解率用）
 let uTotalCorrect = 0;      // 通算正解数（正解率用）
+let uRoundTotalAnswers = 0; // 現在の周回で採点した問題数
+let uRoundTotalCorrect = 0; // 現在の周回で完全正解した問題数
+let uLastRoundAccuracy = 0; // 前回完了した周回の正解率
 let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 
 const state = { queue: [], current: 0, results: [] };
@@ -72,7 +75,7 @@ function buildLeaderboardData(user, displayName) {
   const fields = getLeaderboardFieldNames();
   const roundProgress = Math.floor(uRoundAnswers.length / Math.max(1, info.total) * 100);
   const progressPercent = (uCurrentRound - 1) * 100 + (uRoundAnswers.length / Math.max(1, info.total)) * 100;
-  const accuracy = uTotalAnswers > 0 ? Math.round(uTotalCorrect / uTotalAnswers * 100) : 0;
+  const accuracy = uLastRoundAccuracy;
   const name = displayName || currentNickname || user.displayName || '名無し';
   const data = {
     uid: user.uid,
@@ -687,7 +690,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
           <div class="stat-num" id="stat-round-count">1</div><div class="stat-lbl">現在の周回</div>
         </div>
         <div class="stat-card">
-          <div class="stat-num" id="stat-accuracy">0%</div><div class="stat-lbl">通算正解率</div>
+          <div class="stat-num" id="stat-accuracy">0%</div><div class="stat-lbl">前回の周回の正解率</div>
         </div>
         <div class="stat-card">
           <div class="stat-num" id="stat-total-solved">0</div><div class="stat-lbl">総解答回数</div>
@@ -973,6 +976,9 @@ function startTangoAuthListener() {
             uRoundAnswers = data['roundAnswers' + sfx] || [];
             uTotalAnswers = data['totalAnswers' + sfx] || 0;
             uTotalCorrect = data['totalCorrect' + sfx] || 0;
+            uRoundTotalAnswers = data['roundTotalAnswers' + sfx] || 0;
+            uRoundTotalCorrect = data['roundTotalCorrect' + sfx] || 0;
+            uLastRoundAccuracy = data['lastRoundAccuracy' + sfx] || 0;
             uWordHistory = data['wordHistory' + sfx] || {};
             const progressField = 'difficultyProgress' + sfx;
             if (data[progressField]) { uDifficultyProgress = normalizeDifficultyProgress(data[progressField]); hasCloudDifficultyProgress = true; }
@@ -981,6 +987,9 @@ function startTangoAuthListener() {
             if (data.roundAnswers !== undefined) uRoundAnswers = data.roundAnswers;
             if (data.totalAnswers !== undefined) uTotalAnswers = data.totalAnswers;
             if (data.totalCorrect !== undefined) uTotalCorrect = data.totalCorrect;
+            if (data.roundTotalAnswers !== undefined) uRoundTotalAnswers = data.roundTotalAnswers;
+            if (data.roundTotalCorrect !== undefined) uRoundTotalCorrect = data.roundTotalCorrect;
+            if (data.lastRoundAccuracy !== undefined) uLastRoundAccuracy = data.lastRoundAccuracy;
             if (data.wordHistory !== undefined) uWordHistory = data.wordHistory;
             if (data.difficultyProgress) { uDifficultyProgress = normalizeDifficultyProgress(data.difficultyProgress); hasCloudDifficultyProgress = true; }
           }
@@ -1099,8 +1108,8 @@ function refreshUI() {
   // 今の周回での進捗率（％）
   const progressPercent = Math.floor((uRoundAnswers.length / rangeTotal) * 100);
   
-  // 正解率の計算
-  const accuracyPercent = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+  // 前回完了した周回の正解率
+  const accuracyPercent = uLastRoundAccuracy;
   
   // 1. ホーム画面の進捗テキストとプログレスバーを更新
   document.getElementById('home-progress-text').textContent = `${uCurrentRound}周目 ${progressPercent}%`;
@@ -1344,8 +1353,11 @@ async function submitAnswer(timedOut = false) {
   }
   // ─────────────────────────────────────────
 
-  // 周回モードなら、解いたフラグ（uRoundAnswers）に追加
-  if (!isRandomMode && !uRoundAnswers.includes(wordId)) {
+  // 通常周回の新規問題だけ、周回単位の正解率に加算（ランダム演習・復習は除外）
+  const isNewRoundAnswer = !isRandomMode && !isReviewMode && !uRoundAnswers.includes(wordId);
+  if (isNewRoundAnswer) {
+    uRoundTotalAnswers++;
+    if (grade === "correct") uRoundTotalCorrect++;
     uRoundAnswers.push(wordId);
   }
   
@@ -1374,6 +1386,9 @@ async function submitAnswer(timedOut = false) {
       roundAnswers: uRoundAnswers,
       totalAnswers: uTotalAnswers,
       totalCorrect: uTotalCorrect,
+      ['roundTotalAnswers' + rangeSuffix()]: uRoundTotalAnswers,
+      ['roundTotalCorrect' + rangeSuffix()]: uRoundTotalCorrect,
+      ['lastRoundAccuracy' + rangeSuffix()]: uLastRoundAccuracy,
       wordHistory: uWordHistory,
       lastActive: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).catch(e => console.error("データ即時保存エラー:", e));
@@ -1381,7 +1396,7 @@ async function submitAnswer(timedOut = false) {
     // 👑 ランキング用ドキュメントも同時にリアルタイム更新
     const rangeTotal = (activeRange === 'midterm') ? 141 : 142;
     const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / rangeTotal) * 100);
-    const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+    const totalAccuracy = uLastRoundAccuracy;
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
 
     db.collection('leaderboard').doc(auth.currentUser.uid).set({
@@ -1486,16 +1501,23 @@ function finishQuizSession() {
       document.getElementById('result-title').textContent = `${uCurrentRound}周目 100% 達成！！🎉`;
       document.getElementById('result-sub').textContent = `テスト範囲の全${rangeTotal}語を一回ずつ解破しました！`;
       
-      // 次の周回へカウントアップし、解いたリストをリセット！
+      // 完了した周回の正解率を保存してから、次の周回用カウンターをリセット
+      uLastRoundAccuracy = uRoundTotalAnswers > 0 ? Math.round((uRoundTotalCorrect / uRoundTotalAnswers) * 100) : 0;
       uCurrentRound++;
       uRoundAnswers = [];
+      uRoundTotalAnswers = 0;
+      uRoundTotalCorrect = 0;
       
       // クラウドに周回リセット状態を保存
       if (!isGuest && auth.currentUser) {
-        db.collection('users').doc(auth.currentUser.uid).set({
-          currentRound: uCurrentRound,
-          roundAnswers: uRoundAnswers
-        }, { merge: true });
+        const sfx = rangeSuffix();
+        const roundSave = { currentRound: uCurrentRound, roundAnswers: uRoundAnswers };
+        roundSave['currentRound' + sfx] = uCurrentRound;
+        roundSave['roundAnswers' + sfx] = uRoundAnswers;
+        roundSave['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
+        roundSave['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
+        roundSave['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
+        db.collection('users').doc(auth.currentUser.uid).set(roundSave, { merge: true });
       }
       showScreen('screen-result');
     } else {
@@ -1532,6 +1554,12 @@ async function exitQuizDirect() {
       updates['roundAnswers' + sfx] = uRoundAnswers;
       updates['totalAnswers' + sfx] = uTotalAnswers;
       updates['totalCorrect' + sfx] = uTotalCorrect;
+    updates['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
+    updates['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
+    updates['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
+      updates['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
+      updates['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
+      updates['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
       updates['wordHistory' + sfx] = uWordHistory;
       updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
       await withSaveTimeout(db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true }));
@@ -2392,6 +2420,9 @@ async function submitAnswer(timedOut = false) {
     updates['roundAnswers' + sfx] = uRoundAnswers;
     updates['totalAnswers' + sfx] = uTotalAnswers;
     updates['totalCorrect' + sfx] = uTotalCorrect;
+    updates['roundTotalAnswers' + sfx] = uRoundTotalAnswers;
+    updates['roundTotalCorrect' + sfx] = uRoundTotalCorrect;
+    updates['lastRoundAccuracy' + sfx] = uLastRoundAccuracy;
     updates['wordHistory' + sfx] = uWordHistory;
     persistDifficultyProgress(updates);
     updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
@@ -2728,7 +2759,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v4.1 (特訓メニュー追加・画面構成整理)"; 
+const APP_VERSION = "v4.2 (前回周回の正解率表示)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
