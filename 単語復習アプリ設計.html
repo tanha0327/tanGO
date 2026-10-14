@@ -1284,12 +1284,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // 📝 2学期中間テスト(文章題 1684〜1826)を全員にセット
     const btn2 = document.createElement('button');
-    btn2.textContent = "⚙️ [管理者] 2学期中間(文章題 1684〜1826)を全員にセット";
+    btn2.textContent = "⚙️ [管理者] 2学期中間(文章題 1684〜1826・10/15 9:10)を全員にセット";
     btn2.style = "margin-top:10px; padding:8px; background:#7b1fa2; color:white; border-radius:8px; border:none; width:100%; cursor:pointer; font-weight:bold;";
-    btn2.onclick = () => {
-      const d = prompt("テストの日時を YYYY-MM-DDTHH:MM の形式で入力してください\n(例: 2026-10-23T09:00)", "");
-      if (d) { setAndSaveSharedTest("2学期中間テスト(文章題)", new Date(d).toISOString(), 't2mid'); }
-    };
+    btn2.onclick = () => { setAndSaveSharedTest("2学期中間テスト(文章題) 10/15 9:10", new Date("2026-10-15T09:10:00").toISOString(), 't2mid'); };
     btn.parentNode.insertBefore(btn2, btn.nextSibling);
   }
 });
