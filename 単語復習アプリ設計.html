@@ -289,11 +289,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 
   <div class="modal-overlay" id="exit-modal">
     <div class="modal-box">
-      <div class="modal-title">演習を中断しますか？</div>
-      <div style="font-size:12px; color:#666; text-align:center; margin-bottom:10px;">ここまでの進捗はクラウドに自動保存されています。</div>
+      <div class="modal-title">保存してホームに戻りますか？</div>
+      <div style="font-size:12px; color:#666; text-align:center; margin-bottom:10px;">ここまでの学習進捗を保存してホームに戻ります。</div>
       <div class="modal-btns">
         <button class="big-btn btn-secondary" onclick="document.getElementById('exit-modal').classList.remove('open')">続ける</button>
-        <button class="big-btn btn-wrong-red" onclick="exitQuizDirect()">中断してホームへ</button>
+        <button class="big-btn btn-primary" id="btn-save-exit" onclick="exitQuizDirect()">💾 保存して退出</button>
       </div>
     </div>
   </div>
@@ -417,7 +417,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
     <div class="screen" id="screen-quiz">
       <div class="quiz-header">
         <span id="quiz-counter" style="font-size:13px;color:#888;"></span>
-        <button class="exit-btn" onclick="document.getElementById('exit-modal').classList.add('open')">✕ 中断して退出</button>
+        <button class="exit-btn" onclick="document.getElementById('exit-modal').classList.add('open')">✕ 保存して退出</button>
       </div>
       <div class="progress-wrap"><div class="progress-bar" id="quiz-progress" style="width:0%"></div></div>
       <div class="card">
@@ -892,11 +892,45 @@ function finishQuizSession() {
   }
 }
 
-// ✕ ボタンでいつでも安全に中断して戻れる
-function exitQuizDirect() {
-  document.getElementById('exit-modal').classList.remove('open');
-  showScreen('screen-home');
-  refreshUI();
+// 💾 現在の学習データを保存してホームへ戻る
+async function exitQuizDirect() {
+  const exitBtn = document.getElementById('btn-save-exit');
+  if (exitBtn) { exitBtn.disabled = true; exitBtn.textContent = '保存中…'; }
+  try {
+    if (!isGuest && auth.currentUser) {
+      const sfx = rangeSuffix();
+      const updates = {};
+      updates['currentRound' + sfx] = uCurrentRound;
+      updates['roundAnswers' + sfx] = uRoundAnswers;
+      updates['totalAnswers' + sfx] = uTotalAnswers;
+      updates['totalCorrect' + sfx] = uTotalCorrect;
+      updates['wordHistory' + sfx] = uWordHistory;
+      updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
+
+      const info = getActiveRangeInfo();
+      const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / Math.max(1, info.total)) * 100);
+      const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
+      const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
+      await db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
+        uid: auth.currentUser.uid,
+        displayName: nameToSave,
+        email: auth.currentUser.email,
+        progressPercent: accumulatedProgress,
+        currentRound: uCurrentRound,
+        roundProgress: Math.floor((uRoundAnswers.length / Math.max(1, info.total)) * 100),
+        accuracy: totalAccuracy,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+    document.getElementById('exit-modal').classList.remove('open');
+    showScreen('screen-home');
+    refreshUI();
+  } catch (e) {
+    alert('保存に失敗しました。通信状態を確認して、もう一度お試しください。');
+  } finally {
+    if (exitBtn) { exitBtn.disabled = false; exitBtn.textContent = '💾 保存して退出'; }
+  }
 }
 
 // 👑 リーダーボード表示（進捗％ ＋ 正解率％ の新仕様！）
