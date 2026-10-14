@@ -440,6 +440,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
         <div style="font-size:22px;font-weight:700;" id="result-title">1周目 クリア！</div>
         <div style="font-size:14px;color:#888;margin-top:8px;" id="result-sub">全単語を1回ずつ解破しました！</div>
       </div>
+      <div id="random-report" style="display:none;margin-bottom:1rem;">
+        <div class="card" style="padding:1rem;">
+          <div id="random-report-title" style="font-size:18px;font-weight:800;color:#264653;margin-bottom:12px;">今回の演習レポート</div>
+          <div id="random-report-summary" style="margin-bottom:16px;"></div>
+          <div id="random-report-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>
       <button class="big-btn btn-primary" id="btn-result-home" onclick="showScreen('screen-home');refreshUI();">🏠 ホームへ戻る</button>
     </div>
   </div>
@@ -1415,68 +1422,188 @@ function startReviewMode() {
   if (!ALL_WORDS || ALL_WORDS.length === 0) { alert("⏳ 読み込み中です！"); return; }
   const info = getActiveRangeInfo();
   const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
-  const wrongWords = rangeWords.filter(w => { const h = uWordHistory[w.id]; return h && (h.wrong || 0) > (h.reviewed || 0); });
-  if (wrongWords.length === 0) { alert("✨ 現在、要復習の単語は1つもありません！完璧です！"); return; }
-  isRandomMode = true; isReviewMode = true; 
-  state.queue = wrongWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
-  state.current = 0; state.results = [];
-  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
-}
+  const wrongWords = rangeWords.filter(w =>// 🌟 回答を記録し、終了後のレポートにも利用する
+async function submitAnswer(timedOut = false) {
+  if (questionAnswered) return;
+  questionAnswered = true;
+  stopQuestionTimer();
 
-// 🌟 セーブデータの保存も、範囲ごとに分ける！
-async function submitAnswer() {
-  const ans = document.getElementById('quiz-answer').value.trim().toLowerCase();
-  const currentItem = state.queue[state.current]; const correct = currentItem.word.en; const wordId = currentItem.word.id;
+  const answerInput = document.getElementById('quiz-answer');
+  const enteredAnswer = timedOut ? '' : answerInput.value.trim();
+  const ans = enteredAnswer.toLowerCase();
+  const currentItem = state.queue[state.current];
+  const word = currentItem.word;
+  const correct = word.en;
+  const wordId = word.id;
+
   let grade = 'wrong';
-  if (ans === correct) grade = 'correct'; else if (ans !== '' && (correct.includes(ans) || ans.includes(correct)) && ans.length > 2) grade = 'partial';
-  state.results.push({ grade }); uTotalAnswers++; if(grade === 'correct') uTotalCorrect++;
-  
+  if (ans === correct) grade = 'correct';
+  else if (ans !== '' && (correct.includes(ans) || ans.includes(correct)) && ans.length > 2) grade = 'partial';
+
+  // 問題文・入力内容・正解を保持して、最後に一覧レポートを作れるようにする
+  state.results.push({
+    grade,
+    word: { ...word },
+    userAnswer: enteredAnswer,
+    correctAnswer: correct,
+    timedOut: Boolean(timedOut)
+  });
+
+  uTotalAnswers++;
+  if (grade === 'correct') uTotalCorrect++;
+
   if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
-  uWordHistory[wordId].solved++; if (grade === 'wrong') uWordHistory[wordId].wrong++;
+  uWordHistory[wordId].solved++;
+  if (grade === 'wrong') uWordHistory[wordId].wrong++;
   if (isReviewMode && grade === 'correct') uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
-  if (!uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
-  
-  const cls = grade==='correct'?'result-correct':grade==='partial'?'result-partial':'result-wrong';
-  const lbl = grade==='correct'?'✓ 正解！':grade==='partial'?'△ 部分正解':'✗ 不正解';
+
+  // ランダム演習・復習は通常の周回進捗に加算しない
+  if (!isRandomMode && !uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
+
+  const cls = grade === 'correct' ? 'result-correct' : grade === 'partial' ? 'result-partial' : 'result-wrong';
+  const lbl = grade === 'correct' ? '✓ 正解！' : grade === 'partial' ? '△ 部分正解' : '✗ 不正解';
   const resEl = document.getElementById('quiz-result');
-  resEl.innerHTML = `<div class="result-box ${cls}"><strong>${lbl}</strong><br>模範解答: <strong>${correct}</strong>${currentItem.word.sentence ? `<br><span style="font-size:13px;color:#333;">${escHtml(currentItem.word.sentence.replace('( ____ )', correct))}</span>` : ''}${currentItem.word.sentence && currentItem.word.jp ? `<br><span style="font-size:12px;color:#666;">意味: ${escHtml(currentItem.word.jp)}</span>` : ''}</div>`; resEl.style.display = 'block';
-  document.getElementById('quiz-answer').disabled = true; document.getElementById('btn-submit').style.display = 'none'; document.getElementById('btn-next').style.display = 'block';
+  resEl.innerHTML = '<div class="result-box ' + cls + '"><strong>' + lbl + '</strong><br>模範解答: <strong>' +
+    escapeLeaderboardText(correct) + '</strong>' +
+    (word.sentence ? '<br><span style="font-size:13px;color:#333;">' + escapeLeaderboardText(word.sentence.replace(/\(\s*____\s*\)/g, correct)) + '</span>' : '') +
+    (word.sentenceJp ? '<br><span style="font-size:12px;color:#666;">意味: ' + escapeLeaderboardText(word.sentenceJp) + '</span>' : '') +
+    '</div>';
+  resEl.style.display = 'block';
+
+  if (answerInput) answerInput.disabled = true;
+  const submitBtn = document.getElementById('btn-submit');
+  if (submitBtn) submitBtn.style.display = 'none';
+  const nextBtn = document.getElementById('btn-next');
+  if (nextBtn) nextBtn.style.display = 'block';
+  const timerEl = document.getElementById('quiz-timer');
+  if (timerEl) timerEl.textContent = timedOut ? '時間切れ' : '回答済み';
+  const tapHint = document.getElementById('quiz-tap-hint');
+  if (tapHint) tapHint.textContent = '画面のどこをタップしても次の問題へ進みます。';
 
   if (!isGuest && auth.currentUser) {
     const updates = {};
-    {
-      const sfx = rangeSuffix();
-      updates['currentRound' + sfx] = uCurrentRound; updates['roundAnswers' + sfx] = uRoundAnswers;
-      updates['totalAnswers' + sfx] = uTotalAnswers; updates['totalCorrect' + sfx] = uTotalCorrect;
-      updates['wordHistory' + sfx] = uWordHistory;
-    }
+    const sfx = rangeSuffix();
+    updates['currentRound' + sfx] = uCurrentRound;
+    updates['roundAnswers' + sfx] = uRoundAnswers;
+    updates['totalAnswers' + sfx] = uTotalAnswers;
+    updates['totalCorrect' + sfx] = uTotalCorrect;
+    updates['wordHistory' + sfx] = uWordHistory;
     updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
-    db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
-    
+
+    db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
+      .catch(e => console.error('データ即時保存エラー:', e));
+
     const info = getActiveRangeInfo();
-    const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / info.total) * 100);
+    const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / Math.max(1, info.total)) * 100);
     const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
-    
-    // 🌟 ランキングも休み明け専用データベース「leaderboard_extra」へ隔離！
-    const lbCol = 'leaderboard' + rangeSuffix();
-    db.collection(lbCol).doc(auth.currentUser.uid).set({
-      uid: auth.currentUser.uid, displayName: nameToSave, email: auth.currentUser.email, progressPercent: accumulatedProgress, currentRound: uCurrentRound,
-      roundProgress: Math.floor((uRoundAnswers.length / info.total) * 100), accuracy: totalAccuracy, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
+      uid: auth.currentUser.uid,
+      displayName: nameToSave,
+      email: auth.currentUser.email,
+      progressPercent: accumulatedProgress,
+      currentRound: uCurrentRound,
+      roundProgress: Math.floor((uRoundAnswers.length / Math.max(1, info.total)) * 100),
+      accuracy: totalAccuracy,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.error('ランキング同期エラー:', e));
   }
+}
+
+function renderRandomReport() {
+  const report = document.getElementById('random-report');
+  const title = document.getElementById('random-report-title');
+  const summary = document.getElementById('random-report-summary');
+  const list = document.getElementById('random-report-list');
+  if (!report || !summary || !list) return;
+
+  const results = state.results || [];
+  const total = results.length;
+  const correctCount = results.filter(r => r.grade === 'correct').length;
+  const partialCount = results.filter(r => r.grade === 'partial').length;
+  const wrongCount = results.filter(r => r.grade === 'wrong').length;
+  const accuracy = total ? Math.round(correctCount / total * 100) : 0;
+
+  if (title) title.textContent = isReviewMode ? '🔁 復習演習レポート' : '📝 ランダム演習レポート';
+  summary.innerHTML =
+    '<div style="font-size:13px;color:#667085;margin-bottom:10px;">' + total + '問中、完全正解 ' + correctCount + '問（正解率 ' + accuracy + '%）</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">' +
+      '<div style="background:#f2f8f3;border:1px solid #b9dfc0;border-radius:12px;padding:12px;"><div style="font-size:12px;color:#397448;">完全正解</div><div style="font-size:24px;font-weight:800;color:#1b5e20;">' + correctCount + '<span style="font-size:12px;">問</span></div></div>' +
+      '<div style="background:#fff8e8;border:1px solid #ffe0a3;border-radius:12px;padding:12px;"><div style="font-size:12px;color:#9a6700;">部分正解</div><div style="font-size:24px;font-weight:800;color:#9a6700;">' + partialCount + '<span style="font-size:12px;">問</span></div></div>' +
+      '<div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:12px;"><div style="font-size:12px;color:#be123c;">不正解</div><div style="font-size:24px;font-weight:800;color:#be123c;">' + wrongCount + '<span style="font-size:12px;">問</span></div></div>' +
+      '<div style="background:#f5f7fa;border:1px solid #d8dee8;border-radius:12px;padding:12px;"><div style="font-size:12px;color:#475467;">合計</div><div style="font-size:24px;font-weight:800;color:#344054;">' + total + '<span style="font-size:12px;">問</span></div></div>' +
+    '</div>';
+
+  list.innerHTML = results.map((r, index) => {
+    const word = r.word || (state.queue[index] && state.queue[index].word) || {};
+    const isSentence = Boolean(word.sentence);
+    const prompt = isSentence
+      ? '<div style="font-weight:700;line-height:1.6;">' + escapeLeaderboardText(word.sentence) + '</div>' +
+        (word.sentenceJp ? '<div style="font-size:12px;color:#667085;line-height:1.5;margin-top:5px;">' + escapeLeaderboardText(word.sentenceJp) + '</div>' : '')
+      : '<div style="font-weight:700;line-height:1.6;">' + escapeLeaderboardText(word.jp || '問題文なし') + '</div>';
+
+    const label = r.grade === 'correct' ? '正解' : r.grade === 'partial' ? '部分正解' : '不正解';
+    const color = r.grade === 'correct'
+      ? 'background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;'
+      : r.grade === 'partial'
+        ? 'background:#fff8e1;color:#8a5a00;border:1px solid #ffcc80;'
+        : 'background:#fce4ec;color:#880e4f;border:1px solid #f48fb1;';
+    const userAnswer = r.userAnswer ? escapeLeaderboardText(r.userAnswer) : (r.timedOut ? '時間切れ（未入力）' : '（未入力）');
+    const correctAnswer = escapeLeaderboardText(r.correctAnswer || word.en || '');
+    return '<div style="padding:13px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;">' +
+        '<div style="font-size:12px;color:#667085;font-weight:700;">' + (index + 1) + '問目 · No.' + escapeLeaderboardText(word.id == null ? '—' : word.id) + '</div>' +
+        '<span style="white-space:nowrap;font-size:12px;font-weight:800;padding:4px 8px;border-radius:99px;' + color + '">' + label + '</span>' +
+      '</div>' +
+      prompt +
+      '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #edf0f3;font-size:13px;line-height:1.7;">' +
+        '<div><span style="color:#667085;">あなたの答え：</span><strong>' + userAnswer + '</strong></div>' +
+        '<div><span style="color:#1b5e20;">正解：</span><strong style="color:#1b5e20;">' + correctAnswer + '</strong></div>' +
+      '</div></div>';
+  }).join('');
+
+  report.style.display = 'block';
 }
 
 function finishQuizSession() {
   if (isRandomMode) {
-    document.getElementById('result-title').textContent = "演習完了！";
-    document.getElementById('result-sub').textContent = `${state.results.length}問中 ${state.results.filter(r => r.grade === 'correct').length}問正解！`;
+    const total = state.results.length;
+    const correctCount = state.results.filter(r => r.grade === 'correct').length;
+    const partialCount = state.results.filter(r => r.grade === 'partial').length;
+    const wrongCount = state.results.filter(r => r.grade === 'wrong').length;
+    const accuracy = total ? Math.round(correctCount / total * 100) : 0;
+    document.getElementById('result-emoji').textContent = '📋';
+    document.getElementById('result-title').textContent = isReviewMode ? '復習演習完了！' : 'ランダム演習完了！';
+    document.getElementById('result-sub').textContent = total + '問中、完全正解 ' + correctCount + '問・部分正解 ' + partialCount + '問・不正解 ' + wrongCount + '問（正解率 ' + accuracy + '%）';
+    renderRandomReport();
     showScreen('screen-result');
   } else {
+    const report = document.getElementById('random-report');
+    if (report) report.style.display = 'none';
+    document.getElementById('result-emoji').textContent = '🎉';
     const info = getActiveRangeInfo();
     if (uRoundAnswers.length >= info.total) {
-      document.getElementById('result-title').textContent = `${uCurrentRound}周目 100% 達成！！🎉`;
-      document.getElementById('result-sub').textContent = `全${info.total}語を一回ずつ解破しました！`;
+      document.getElementById('result-title').textContent = uCurrentRound + '周目 100% 達成！！🎉';
+      document.getElementById('result-sub').textContent = '全' + info.total + '語を一回ずつ解き終わりました！';
+      uCurrentRound++;
+      uRoundAnswers = [];
+      if (!isGuest && auth.currentUser) {
+        const updates = {};
+        const sfx = rangeSuffix();
+        updates['currentRound' + sfx] = uCurrentRound;
+        updates['roundAnswers' + sfx] = uRoundAnswers;
+        db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
+          .catch(e => console.error('周回データ保存エラー:', e));
+      }
+      showScreen('screen-result');
+    } else {
+      showScreen('screen-home');
+      refreshUI();
+    }
+  }
+}
+
+語を一回ずつ解破しました！`;
       uCurrentRound++; uRoundAnswers = [];
       if (!isGuest && auth.currentUser) {
         const updates = {};
@@ -1689,7 +1816,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.4 (起動時の同期修正)"; 
+const APP_VERSION = "v2.5 (ランダム演習レポート)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
