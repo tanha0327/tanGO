@@ -630,6 +630,23 @@ window.__tangoInitialWatchdog = setTimeout(() => {
     </div>
   </div>
 
+  <div class="modal-overlay" id="wrong-count-practice-modal">
+    <div class="modal-box" style="max-width:400px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div class="modal-title" style="margin:0;">🔥 間違えた回数別に特訓</div>
+        <button onclick="document.getElementById('wrong-count-practice-modal').classList.remove('open')" style="border:none;background:none;font-size:24px;cursor:pointer;">×</button>
+      </div>
+      <div style="font-size:13px;color:#777;margin-bottom:12px;">選択中の範囲から、過去に間違えた回数で問題を絞り込みます。複数ある場合は間違い回数が多い順です。</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="big-btn btn-secondary" onclick="startWrongCountPractice(1,1)">1回間違えた</button>
+        <button class="big-btn btn-secondary" onclick="startWrongCountPractice(2,2)">2回間違えた</button>
+        <button class="big-btn btn-secondary" onclick="startWrongCountPractice(3,3)">3回間違えた</button>
+        <button class="big-btn btn-secondary" onclick="startWrongCountPractice(4,Infinity)">4回以上</button>
+        <button class="big-btn btn-primary" style="grid-column:span 2;" onclick="startWrongCountPractice(1,Infinity)">全部を間違い回数が多い順に</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="leaderboard-modal">
     <div class="modal-box" style="max-width:420px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
@@ -721,6 +738,16 @@ window.__tangoInitialWatchdog = setTimeout(() => {
           <div style="flex:1;">
             <div style="font-weight:800;margin-bottom:5px;">reで始まる単語</div>
             <div style="font-size:12px;color:#888;">2学期中間（文章題）の範囲限定</div>
+          </div>
+          <div style="font-size:22px;color:#888;">›</div>
+        </div>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="openWrongCountPracticeModal()">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:28px;">🔥</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;margin-bottom:5px;">間違えた回数別に特訓</div>
+            <div style="font-size:12px;color:#888;">1回・2回・3回・4回以上から選択（間違いが多い順）</div>
           </div>
           <div style="font-size:22px;color:#888;">›</div>
         </div>
@@ -1240,6 +1267,37 @@ function startRandomN() {
   
   document.getElementById('random-modal').classList.remove('open');
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
+}
+
+// 🔥 間違えた回数で絞り込む特訓メニュー
+function openWrongCountPracticeModal() {
+  document.getElementById("wrong-count-practice-modal").classList.add("open");
+}
+
+function startWrongCountPractice(minWrong, maxWrong) {
+  if (!ALL_WORDS || ALL_WORDS.length === 0) {
+    alert("⏳ 単語データを読み込み中です！");
+    return;
+  }
+  const info = getActiveRangeInfo();
+  const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
+  const selectedWords = rangeWords.map(word => {
+    const h = uWordHistory[String(word.id)] || uWordHistory[word.id];
+    return { word, wrong: h ? (Number(h.wrong) || 0) : 0 };
+  }).filter(row => row.wrong >= minWrong && row.wrong <= maxWrong)
+    .sort((a, b) => b.wrong - a.wrong || String(a.word.en || "").localeCompare(String(b.word.en || "")));
+
+  if (selectedWords.length === 0) {
+    alert("この回数に当てはまる単語はまだありません。");
+    return;
+  }
+  isRandomMode = true;
+  isReviewMode = false;
+  state.queue = selectedWords.map(row => ({ word: row.word, dir: "jp-en" }));
+  state.current = 0;
+  state.results = [];
+  document.getElementById("wrong-count-practice-modal").classList.remove("open");
+  playTangoEffect(() => { showScreen("screen-quiz"); renderQuestion(); });
 }
 
 // 🔥 間違えた単語だけを抽出する「復習（復讐）モード」
@@ -2756,7 +2814,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v4.2 (前回周回の正解率表示)"; 
+const APP_VERSION = "v4.3 (間違えた回数別の特訓)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
