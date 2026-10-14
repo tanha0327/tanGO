@@ -418,10 +418,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
       </div>
     </div>
 
-    <div class="screen" id="screen-quiz">
+    <div class="screen" id="screen-quiz" onclick="handleQuizTap(event)">
       <div class="quiz-header">
-        <span id="quiz-counter" style="font-size:13px;color:#888;"></span>
-        <button class="exit-btn" onclick="document.getElementById('exit-modal').classList.add('open')">✕ 保存して退出</button>
+        <div style="display:flex;align-items:center;gap:8px;"><span id="quiz-counter" style="font-size:13px;color:#888;"></span><span id="quiz-timer" style="font-size:13px;font-weight:800;color:#264653;background:#e9c46a;padding:7px 10px;border-radius:10px;white-space:nowrap;">10秒</span></div>
+        <button class="exit-btn" onclick="event.stopPropagation();document.getElementById('exit-modal').classList.add('open')">✕ 保存して退出</button>
       </div>
       <div class="progress-wrap"><div class="progress-bar" id="quiz-progress" style="width:0%"></div></div>
       <div class="card">
@@ -583,6 +583,7 @@ window.onload = () => {
 };
 
 function showScreen(id) {
+  stopQuestionTimer();
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('visible'));
   document.getElementById(id).classList.add('visible');
 }
@@ -748,7 +749,25 @@ function startReviewMode() {
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
+let questionTimer = null;
+let questionSecondsLeft = 10;
+let questionAnswered = false;
+const QUESTION_TIME_LIMIT = 10;
+function stopQuestionTimer() { if (questionTimer) { clearInterval(questionTimer); questionTimer = null; } }
+function startQuestionTimer() {
+  stopQuestionTimer(); questionSecondsLeft = QUESTION_TIME_LIMIT;
+  const el = document.getElementById("quiz-timer");
+  el.textContent = questionSecondsLeft + "秒"; el.style.background = "#e9c46a"; el.style.color = "#264653";
+  questionTimer = setInterval(() => {
+    if (questionAnswered) { stopQuestionTimer(); return; }
+    questionSecondsLeft--; el.textContent = questionSecondsLeft + "秒";
+    if (questionSecondsLeft <= 3) { el.style.background = "#e76f51"; el.style.color = "white"; }
+    if (questionSecondsLeft <= 0) { stopQuestionTimer(); submitAnswer(true); }
+  }, 1000);
+}
+
 function renderQuestion() {
+  stopQuestionTimer(); questionAnswered = false;
   const w = state.queue[state.current].word;
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
@@ -766,14 +785,18 @@ function renderQuestion() {
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
-  document.getElementById('btn-next').style.display = 'none';
+  document.getElementById('btn-reveal').style.display = 'block';
+  document.getElementById('quiz-tap-hint').textContent = '制限時間内に回答。答えが出たら画面のどこをタップしても次へ進みます。';
+  startQuestionTimer();
   // 自動フォーカスを外し、スマホでキーボードが勝手に開くのを防ぐ。
 }
 
 // 🌟 解答が送信された瞬間に、裏でクラウドデータベースへリアルタイム保存！
 // 🌟 解答が送信された瞬間の処理（周回管理 ＆ 復習成功カウンター連動版）
-async function submitAnswer() {
-  const ans = document.getElementById('quiz-answer').value.trim().toLowerCase();
+async function submitAnswer(timedOut = false) {
+  if (questionAnswered) return;
+  questionAnswered = true; stopQuestionTimer();
+  const ans = timedOut ? '' : document.getElementById('quiz-answer').value.trim().toLowerCase();
   const currentItem = state.queue[state.current];
   const correct = currentItem.word.en;
   const wordId = currentItem.word.id;
@@ -816,7 +839,9 @@ async function submitAnswer() {
   
   document.getElementById('quiz-answer').disabled = true;
   document.getElementById('btn-submit').style.display = 'none';
-  document.getElementById('btn-next').style.display = 'block';
+  document.getElementById('btn-reveal').style.display = 'none';
+  document.getElementById('quiz-timer').textContent = timedOut ? '時間切れ' : '回答済み';
+  document.getElementById('quiz-tap-hint').textContent = '画面のどこをタップしても次の問題へ進みます。';
 
   // 2. ☁️ 即座に個人のFirestoreデータベースに完全バックアップ送信！
   if (!isGuest && auth.currentUser) {
@@ -848,7 +873,27 @@ async function submitAnswer() {
   }
 }
 
+function revealAnswer() {
+  if (questionAnswered) return;
+  const item = state.queue[state.current].word;
+  const correct = item.en;
+  const resEl = document.getElementById("quiz-result");
+  resEl.innerHTML = '<div class="result-box result-partial"><strong>💡 模範解答</strong><br><strong>' + escHtml(correct) + '</strong></div>';
+  resEl.style.display = "block";
+  document.getElementById("quiz-answer").disabled = true;
+  document.getElementById("btn-submit").style.display = "none";
+  document.getElementById("btn-reveal").style.display = "none";
+  questionAnswered = true; stopQuestionTimer();
+  document.getElementById("quiz-timer").textContent = "答え";
+  document.getElementById("quiz-tap-hint").textContent = "画面のどこをタップしても次の問題へ進みます。";
+}
+function handleQuizTap(event) {
+  if (!questionAnswered) return;
+  if (event.target.closest("button, input, .modal-box, .exit-btn")) return;
+  nextQuestion();
+}
 function nextQuestion() {
+  if (!questionAnswered) return;
   state.current++;
   if (state.current >= state.queue.length) {
     // 全問題を解き終わった時
