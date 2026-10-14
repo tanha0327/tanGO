@@ -52,7 +52,7 @@ let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 const state = { queue: [], current: 0, results: [] };
 
 // 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
-function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : ''); }
+function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : '')); }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
 // 🌟 テスト範囲の選択肢（ユーザーごとに端末へ記憶。初期値は今回の範囲＝2学期中間）
 const RANGE_OPTIONS = [
@@ -78,6 +78,9 @@ function selectRange(key) {
 function updateRangeButton() {
   const btn = document.getElementById('btn-range-select'); if (!btn) return;
   const o = RANGE_OPTIONS.find(x => x.key === activeRange);
+  const rn = o ? o.label.replace(/^\S+\s*/, '') : '';
+  const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `👑 ${rn} 進捗トップ3 (タップで詳細)`;
+  const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `🏆 ${rn} 進捗ランキング`;
   btn.textContent = `📚 テスト範囲：${o ? o.label.replace(/^\S+\s*/, '') : ''}（タップで変更）`;
 }
 function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -301,7 +304,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
   <div class="modal-overlay" id="leaderboard-modal">
     <div class="modal-box" style="max-width:420px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-        <div class="modal-title" style="margin:0;">🏆 全体進捗ランキング</div>
+        <div class="modal-title" style="margin:0;" id="leaderboard-modal-title">🏆 全体進捗ランキング</div>
         <button onclick="document.getElementById('leaderboard-modal').classList.remove('open')" style="border:none;background:none;font-size:24px;cursor:pointer;">×</button>
       </div>
       <div id="leaderboard-content-full"></div>
@@ -340,7 +343,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
       </div>
 
       <div class="card" style="cursor:pointer; margin-bottom:1.25rem;" onclick="openLeaderboardModal()" title="タップしてランキング詳細を見る">
-        <div class="label" style="margin-bottom:10px;">👑 クラウド進捗トップ3 (タップで詳細)</div>
+        <div class="label" style="margin-bottom:10px;" id="leaderboard-top3-title">👑 クラウド進捗トップ3 (タップで詳細)</div>
         <div id="home-leaderboard" style="font-size:14px;color:#333;line-height:1.6;"></div>
       </div>
       
