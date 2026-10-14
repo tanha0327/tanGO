@@ -530,6 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
   auth.onAuthStateChanged(async (user) => {
     authStateResolved = true;
     clearTimeout(startupWatchdog);
+    // 匿名認証ユーザーは問題演習できるゲストとして扱い、学習データは保存しない
+    isGuest = Boolean(user && user.isAnonymous);
     // 🌟 1. まずLINEブラウザかどうかを判定する
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isLine = ua.indexOf("Line") > -1;
@@ -1238,13 +1240,21 @@ function playTangoEffect(callback) {
 
 // 🔓 ログアウト・ゲストログイン
 function logout() { auth.signOut().then(() => window.location.reload()); }
-function loginAsGuest() {
-  isGuest = true; document.getElementById('user-info').textContent = "👤 ゲストユーザー";
-  document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
-  activeRange = getSavedRange();
-  const guestRangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
-  testDate = guestRangeOpt && guestRangeOpt.testDate ? new Date(guestRangeOpt.testDate) : null;
-  startCountdown(); refreshUI();
+async function loginAsGuest() {
+  // Firestoreの単語データはログイン済みユーザーにのみ読み取りを許可しているため、
+  // 匿名認証で安全に読み込みつつ、ゲストの学習進捗は保存しない。
+  const button = document.querySelector('button[onclick="loginAsGuest()"]');
+  if (button) { button.disabled = true; button.textContent = 'ゲストを準備中…'; }
+  showSyncLoading('ゲストで準備しています', '単語データを読み込んでいます。');
+  try {
+    await auth.signInAnonymously();
+    // 認証後の画面初期化は onAuthStateChanged に任せる
+  } catch (e) {
+    console.error('ゲスト認証エラー:', e);
+    hideSyncLoading();
+    if (button) { button.disabled = false; button.textContent = 'Continue as Guest'; }
+    alert('ゲストとして開始できませんでした。Firebase Console の Authentication → Sign-in method で「匿名（Anonymous）」を有効にしてから、もう一度お試しください。');
+  }
 }
 
 function loginWithGoogle() {
@@ -1419,19 +1429,39 @@ function startRandomN() {
 }
 
 function startReviewMode() {
-  if (!ALL_WORDS || ALL_WORDS.length === 0) { alert("⏳ 読み込み中です！"); return; }
+  if (!ALL_WORDS || ALL_WORDS.length === 0) {
+    alert('単語データを読み込めていません。再読み込みしてもう一度お試しください。');
+    return;
+  }
   const info = getActiveRangeInfo();
   const rangeWords = ALL_WORDS.slice(info.lo, info.hi + 1);
-  const wrongWords = rangeWords.filter(w =>// 🌟 回答を記録し、終了後のレポートにも利用する
+  const wrongWords = rangeWords.filter(w => {
+    const h = uWordHistory[w.id];
+    return h && (h.wrong || 0) > (h.reviewed || 0);
+  });
+  if (wrongWords.length === 0) {
+    alert('✨ 現在、要復習の単語はありません！');
+    return;
+  }
+  isRandomMode = true;
+  isReviewMode = true;
+  state.queue = wrongWords.map(w => ({ word: w, dir: 'jp-en' })).sort(() => Math.random() - 0.5);
+  state.current = 0;
+  state.results = [];
+  playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
+}
+
+// 回答内容を保存し、ランダム演習の終了レポートに利用する
 async function submitAnswer(timedOut = false) {
   if (questionAnswered) return;
   questionAnswered = true;
   stopQuestionTimer();
 
   const answerInput = document.getElementById('quiz-answer');
-  const enteredAnswer = timedOut ? '' : answerInput.value.trim();
+  const enteredAnswer = timedOut ? '' : (answerInput ? answerInput.value.trim() : '');
   const ans = enteredAnswer.toLowerCase();
   const currentItem = state.queue[state.current];
+  if (!currentItem || !currentItem.word) return;
   const word = currentItem.word;
   const correct = word.en;
   const wordId = word.id;
@@ -1440,7 +1470,6 @@ async function submitAnswer(timedOut = false) {
   if (ans === correct) grade = 'correct';
   else if (ans !== '' && (correct.includes(ans) || ans.includes(correct)) && ans.length > 2) grade = 'partial';
 
-  // 問題文・入力内容・正解を保持して、最後に一覧レポートを作れるようにする
   state.results.push({
     grade,
     word: { ...word },
@@ -1451,45 +1480,41 @@ async function submitAnswer(timedOut = false) {
 
   uTotalAnswers++;
   if (grade === 'correct') uTotalCorrect++;
-
   if (!uWordHistory[wordId]) uWordHistory[wordId] = { solved: 0, wrong: 0, reviewed: 0 };
   uWordHistory[wordId].solved++;
   if (grade === 'wrong') uWordHistory[wordId].wrong++;
   if (isReviewMode && grade === 'correct') uWordHistory[wordId].reviewed = uWordHistory[wordId].wrong;
-
-  // ランダム演習・復習は通常の周回進捗に加算しない
   if (!isRandomMode && !uRoundAnswers.includes(wordId)) uRoundAnswers.push(wordId);
 
   const cls = grade === 'correct' ? 'result-correct' : grade === 'partial' ? 'result-partial' : 'result-wrong';
   const lbl = grade === 'correct' ? '✓ 正解！' : grade === 'partial' ? '△ 部分正解' : '✗ 不正解';
   const resEl = document.getElementById('quiz-result');
-  resEl.innerHTML = '<div class="result-box ' + cls + '"><strong>' + lbl + '</strong><br>模範解答: <strong>' +
-    escapeLeaderboardText(correct) + '</strong>' +
-    (word.sentence ? '<br><span style="font-size:13px;color:#333;">' + escapeLeaderboardText(word.sentence.replace(/\(\s*____\s*\)/g, correct)) + '</span>' : '') +
-    (word.sentenceJp ? '<br><span style="font-size:12px;color:#666;">意味: ' + escapeLeaderboardText(word.sentenceJp) + '</span>' : '') +
-    '</div>';
-  resEl.style.display = 'block';
+  if (resEl) {
+    resEl.innerHTML = '<div class="result-box ' + cls + '"><strong>' + lbl + '</strong><br>模範解答: <strong>' +
+      escapeLeaderboardText(correct) + '</strong>' +
+      (word.sentence ? '<br><span style="font-size:13px;color:#333;">' + escapeLeaderboardText(word.sentence.replace(/\(\s*____\s*\)/g, correct)) + '</span>' : '') +
+      (word.sentenceJp ? '<br><span style="font-size:12px;color:#666;">意味: ' + escapeLeaderboardText(word.sentenceJp) + '</span>' : '') +
+      '</div>';
+    resEl.style.display = 'block';
+  }
 
   if (answerInput) answerInput.disabled = true;
   const submitBtn = document.getElementById('btn-submit');
   if (submitBtn) submitBtn.style.display = 'none';
-  const nextBtn = document.getElementById('btn-next');
-  if (nextBtn) nextBtn.style.display = 'block';
   const timerEl = document.getElementById('quiz-timer');
   if (timerEl) timerEl.textContent = timedOut ? '時間切れ' : '回答済み';
   const tapHint = document.getElementById('quiz-tap-hint');
   if (tapHint) tapHint.textContent = '画面のどこをタップしても次の問題へ進みます。';
 
   if (!isGuest && auth.currentUser) {
-    const updates = {};
     const sfx = rangeSuffix();
+    const updates = {};
     updates['currentRound' + sfx] = uCurrentRound;
     updates['roundAnswers' + sfx] = uRoundAnswers;
     updates['totalAnswers' + sfx] = uTotalAnswers;
     updates['totalCorrect' + sfx] = uTotalCorrect;
     updates['wordHistory' + sfx] = uWordHistory;
     updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
-
     db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
       .catch(e => console.error('データ即時保存エラー:', e));
 
@@ -1524,7 +1549,7 @@ function renderRandomReport() {
   const wrongCount = results.filter(r => r.grade === 'wrong').length;
   const accuracy = total ? Math.round(correctCount / total * 100) : 0;
 
-  if (title) title.textContent = isReviewMode ? '🔁 復習演習レポート' : '📝 ランダム演習レポート';
+  title.textContent = isReviewMode ? '🔁 復習演習レポート' : '📝 ランダム演習レポート';
   summary.innerHTML =
     '<div style="font-size:13px;color:#667085;margin-bottom:10px;">' + total + '問中、完全正解 ' + correctCount + '問（正解率 ' + accuracy + '%）</div>' +
     '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">' +
@@ -1536,8 +1561,7 @@ function renderRandomReport() {
 
   list.innerHTML = results.map((r, index) => {
     const word = r.word || (state.queue[index] && state.queue[index].word) || {};
-    const isSentence = Boolean(word.sentence);
-    const prompt = isSentence
+    const prompt = word.sentence
       ? '<div style="font-weight:700;line-height:1.6;">' + escapeLeaderboardText(word.sentence) + '</div>' +
         (word.sentenceJp ? '<div style="font-size:12px;color:#667085;line-height:1.5;margin-top:5px;">' + escapeLeaderboardText(word.sentenceJp) + '</div>' : '')
       : '<div style="font-weight:700;line-height:1.6;">' + escapeLeaderboardText(word.jp || '問題文なし') + '</div>';
@@ -1550,12 +1574,12 @@ function renderRandomReport() {
         : 'background:#fce4ec;color:#880e4f;border:1px solid #f48fb1;';
     const userAnswer = r.userAnswer ? escapeLeaderboardText(r.userAnswer) : (r.timedOut ? '時間切れ（未入力）' : '（未入力）');
     const correctAnswer = escapeLeaderboardText(r.correctAnswer || word.en || '');
+    const questionNo = escapeLeaderboardText(word.id == null ? '—' : word.id);
     return '<div style="padding:13px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px;">' +
-        '<div style="font-size:12px;color:#667085;font-weight:700;">' + (index + 1) + '問目 · No.' + escapeLeaderboardText(word.id == null ? '—' : word.id) + '</div>' +
+        '<div style="font-size:12px;color:#667085;font-weight:700;">' + (index + 1) + '問目 · No.' + questionNo + '</div>' +
         '<span style="white-space:nowrap;font-size:12px;font-weight:800;padding:4px 8px;border-radius:99px;' + color + '">' + label + '</span>' +
-      '</div>' +
-      prompt +
+      '</div>' + prompt +
       '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #edf0f3;font-size:13px;line-height:1.7;">' +
         '<div><span style="color:#667085;">あなたの答え：</span><strong>' + userAnswer + '</strong></div>' +
         '<div><span style="color:#1b5e20;">正解：</span><strong style="color:#1b5e20;">' + correctAnswer + '</strong></div>' +
@@ -1600,18 +1624,6 @@ function finishQuizSession() {
       showScreen('screen-home');
       refreshUI();
     }
-  }
-}
-
-語を一回ずつ解破しました！`;
-      uCurrentRound++; uRoundAnswers = [];
-      if (!isGuest && auth.currentUser) {
-        const updates = {};
-        { const sfx = rangeSuffix(); updates['currentRound' + sfx] = uCurrentRound; updates['roundAnswers' + sfx] = uRoundAnswers; }
-        db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
-      }
-      showScreen('screen-result');
-    } else { showScreen('screen-home'); refreshUI(); }
   }
 }
 
@@ -1816,7 +1828,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.5 (ランダム演習レポート)"; 
+const APP_VERSION = "v2.6 (ゲスト学習・演習レポート)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
