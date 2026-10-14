@@ -344,6 +344,51 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 .login-divider:not(:empty)::after { margin-left: 15px; }
 .login-legal { font-size: 10px; color: #888; margin-top: 40px; line-height: 1.5; }
 
+
+/* JSTの東京の日没時刻に合わせた自動ダークモード */
+html.dark-mode body { background:#111820 !important; color:#e7edf2 !important; color-scheme:dark; }
+html.dark-mode .card,
+html.dark-mode .stat-card,
+html.dark-mode .modal-box,
+html.dark-mode .word-admin-row,
+html.dark-mode .login-left { background:#1b2632 !important; color:#e7edf2 !important; border-color:#344352 !important; }
+html.dark-mode .label,
+html.dark-mode .stat-lbl,
+html.dark-mode .quiz-hint,
+html.dark-mode .word-admin-jp,
+html.dark-mode .login-content p,
+html.dark-mode .login-legal { color:#aab7c4 !important; }
+html.dark-mode .stat-num,
+html.dark-mode .quiz-word,
+html.dark-mode .modal-title,
+html.dark-mode .login-content h1,
+html.dark-mode .word-admin-en { color:#e7edf2 !important; }
+html.dark-mode .opt-btn,
+html.dark-mode .word-admin-difficulty-btn { background:#202d3a !important; color:#e7edf2 !important; border-color:#3b4a59 !important; }
+html.dark-mode .opt-btn.selected,
+html.dark-mode .word-admin-difficulty-btn.selected { background:rgba(42,157,143,.2) !important; border-color:#2a9d8f !important; color:#70d9cb !important; }
+html.dark-mode .text-input { background:#111a23 !important; color:#f2f6fa !important; border-color:#3b4a59 !important; }
+html.dark-mode .text-input:focus { background:#17232e !important; border-color:#2a9d8f !important; }
+html.dark-mode .btn-secondary,
+html.dark-mode .exit-btn { background:#2b3947 !important; color:#e7edf2 !important; }
+html.dark-mode .btn-secondary:hover,
+html.dark-mode .exit-btn:hover { background:#374858 !important; }
+html.dark-mode .progress-wrap,
+html.dark-mode .slider-wrap input[type=range] { background:#344352 !important; }
+html.dark-mode .modal-overlay { background:rgba(0,0,0,.72) !important; }
+html.dark-mode #sync-loading { background:rgba(17,24,32,.98) !important; color:#e7edf2 !important; }
+html.dark-mode #sync-loading-message { color:#aab7c4 !important; }
+html.dark-mode .word-admin-row.keyboard-current { background:#203a3b !important; }
+html.dark-mode .modern-login-screen,
+html.dark-mode .login-left { background:#111820 !important; }
+html.dark-mode .btn-social { background:#2b3947 !important; color:#e7edf2 !important; }
+html.dark-mode .login-divider::before,
+html.dark-mode .login-divider::after { border-color:#344352 !important; }
+html.dark-mode #transition-screen { filter:brightness(.78); }
+html.dark-mode .result-correct { background:#183b2b !important; color:#a7edbd !important; border-color:#286344 !important; }
+html.dark-mode .result-wrong { background:#421f2d !important; color:#ffb6cb !important; border-color:#71334a !important; }
+html.dark-mode .result-partial { background:#44351c !important; color:#ffda8a !important; border-color:#775a27 !important; }
+
 </style>
 </head>
 <body>
@@ -2522,7 +2567,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.5 (難易度別一周目進捗同期)"; 
+const APP_VERSION = "v3.6 (JST日没ダークモード)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
@@ -2585,5 +2630,68 @@ function openExternalBrowser() {
   window.location.href = currentUrl + separator + 'openExternalBrowser=1';
 }
 </script>
+
+<script>
+// 東京の緯度・経度を基準に、JSTでの日没時刻を計算して自動切替。
+// 時刻計算は端末のタイムゾーンに依存せず Asia/Tokyo を使う。
+(function initSunsetDarkMode() {
+  const TIME_ZONE = 'Asia/Tokyo';
+  const LATITUDE = 35.6812;
+  const LONGITUDE = 139.7671;
+
+  function tokyoNowParts() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date());
+    const values = {};
+    parts.forEach(p => { if (p.type !== 'literal') values[p.type] = Number(p.value); });
+    return values;
+  }
+
+  function sunsetMinutesJST(year, month, day) {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const dayOfYear = Math.floor((date - Date.UTC(year, 0, 0)) / 86400000);
+    const gamma = 2 * Math.PI / 365 * (dayOfYear - 1);
+    const eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma)
+      - 0.032077 * Math.sin(gamma) - 0.014615 * Math.cos(2 * gamma)
+      - 0.040849 * Math.sin(2 * gamma));
+    const decl = 0.006918 - 0.399912 * Math.cos(gamma)
+      + 0.070257 * Math.sin(gamma) - 0.006758 * Math.cos(2 * gamma)
+      + 0.000907 * Math.sin(2 * gamma) - 0.002697 * Math.cos(3 * gamma)
+      + 0.00148 * Math.sin(3 * gamma);
+    const lat = LATITUDE * Math.PI / 180;
+    const zenith = 90.833 * Math.PI / 180;
+    const cosHourAngle = Math.cos(zenith) / (Math.cos(lat) * Math.cos(decl))
+      - Math.tan(lat) * Math.tan(decl);
+    if (cosHourAngle < -1) return 1080;
+    if (cosHourAngle > 1) return 900;
+    const hourAngle = Math.acos(cosHourAngle) * 180 / Math.PI;
+    const solarNoon = 720 - 4 * LONGITUDE - eqTime + 9 * 60;
+    return solarNoon + 4 * hourAngle;
+  }
+
+  function updateTheme() {
+    try {
+      const now = tokyoNowParts();
+      const currentMinutes = now.hour * 60 + now.minute;
+      const sunset = sunsetMinutesJST(now.year, now.month, now.day);
+      const shouldBeDark = currentMinutes >= sunset || currentMinutes < 5 * 60;
+      document.documentElement.classList.toggle('dark-mode', shouldBeDark);
+      document.documentElement.dataset.theme = shouldBeDark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = shouldBeDark ? 'dark' : 'light';
+    } catch (error) {
+      console.warn('自動ダークモードの時刻計算に失敗しました:', error);
+    }
+  }
+
+  updateTheme();
+  window.setInterval(updateTheme, 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) updateTheme();
+  });
+})();
+</script>
+
 </body>
 </html>
