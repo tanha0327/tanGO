@@ -262,6 +262,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 .word-admin-range-buttons { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin:10px 0 14px; }
 .word-admin-range-buttons .opt-btn { padding:10px 6px; font-size:12px; }
 .word-admin-row { display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid #e8e8e8; border-radius:10px; background:#fff; }
+.word-admin-row.keyboard-current { border:2px solid #2a9d8f; background:#f2fbf9; }
 .word-admin-en { font-weight:700; overflow-wrap:anywhere; }
 .word-admin-jp { font-size:12px; color:#777; margin-top:3px; }
 .word-admin-difficulty-buttons { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; }
@@ -486,6 +487,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
     <div class="modal-box" style="max-width:620px;">
       <div class="modal-title">🛠️ 単語難易度の管理</div>
       <div style="font-size:12px;color:#777;margin-bottom:10px;">テスト範囲を選んで、その範囲の単語だけを「基礎・標準・挑戦」に分類します。</div>
+      <div style="font-size:12px;color:#2a756c;background:#eef9f6;padding:9px 10px;border-radius:8px;margin-bottom:10px;">⌨️ キーボード分類：← 基礎 ／ ↓ 標準 ／ → 挑戦。分類後は次の単語へ進みます。</div>
       <div class="word-admin-range-buttons" id="word-admin-range-buttons">
         <button type="button" class="opt-btn selected" data-range="t2mid" onclick="setWordAdminRange('t2mid')">📝 2学期中間</button>
         <button type="button" class="opt-btn" data-range="extra" onclick="setWordAdminRange('extra')">🏖️ 休み明け</button>
@@ -1665,6 +1667,7 @@ const ADMIN_EMAIL = 'hanta0327@gmail.com';
 let wordDifficultyMap = {};
 let wordAdminFiltered = 'unclassified';
 let wordAdminRange = 't2mid';
+let wordAdminKeyboardIndex = 0;
 
 function isWordAdmin(user = auth.currentUser) {
   return !!(user && !user.isAnonymous && user.email && user.email.toLowerCase() === ADMIN_EMAIL && user.emailVerified);
@@ -1761,6 +1764,7 @@ function openWordAdmin() {
 
 function setWordAdminRange(rangeKey) {
   if (!['midterm', 'final', 'extra', 't2mid'].includes(rangeKey)) return;
+  wordAdminKeyboardIndex = 0;
   wordAdminRange = rangeKey;
   document.querySelectorAll('#word-admin-range-buttons [data-range]').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.range === rangeKey);
@@ -1769,6 +1773,7 @@ function setWordAdminRange(rangeKey) {
 }
 
 function setWordAdminFilter(filter) {
+  wordAdminKeyboardIndex = 0;
   wordAdminFiltered = filter;
   ['unclassified', 'all', 'hard'].forEach(key => {
     const btn = document.getElementById('word-admin-filter-' + key);
@@ -1806,6 +1811,7 @@ function renderWordAdminList() {
   const list = document.getElementById('word-admin-list');
   if (!list) return;
   const query = (document.getElementById('word-admin-search')?.value || '').trim().toLowerCase();
+  wordAdminKeyboardIndex = Math.max(0, wordAdminKeyboardIndex);
   const info = getWordAdminRangeInfo(wordAdminRange);
   const rangeWords = ALL_WORDS.slice(Math.max(0, info.lo), Math.min(ALL_WORDS.length - 1, info.hi) + 1);
   const unclassified = rangeWords.filter(w => !getWordDifficulty(w, wordAdminRange));
@@ -1820,8 +1826,10 @@ function renderWordAdminList() {
   if (summary) summary.textContent = info.label + '：分類済み ' + (rangeWords.length - unclassified.length) + ' / ' + rangeWords.length + '語 · 表示 ' + filtered.length + '語（最大250語）';
   list.innerHTML = '';
   if (!filtered.length) { list.textContent = '該当する単語がありません。'; return; }
-  filtered.forEach(w => {
-    const row = document.createElement('div'); row.className = 'word-admin-row';
+  wordAdminKeyboardIndex = Math.min(wordAdminKeyboardIndex, filtered.length - 1);
+  filtered.forEach((w, rowIndex) => {
+    const row = document.createElement('div'); row.className = 'word-admin-row' + (rowIndex === wordAdminKeyboardIndex ? ' keyboard-current' : '');
+    row.dataset.wordAdminIndex = String(rowIndex);
     const details = document.createElement('div');
     const en = document.createElement('div'); en.className = 'word-admin-en'; en.textContent = w.en || '（英単語なし）';
     const jp = document.createElement('div'); jp.className = 'word-admin-jp'; jp.textContent = w.jp || '訳なし';
@@ -1849,6 +1857,29 @@ function renderWordAdminList() {
     list.appendChild(row);
   });
 }
+
+
+// 管理画面が開いているときだけ、矢印キーで現在の単語を分類する。
+// 検索欄に入力中は通常のカーソル操作を優先する。
+document.addEventListener('keydown', event => {
+  const modal = document.getElementById('word-admin-modal');
+  if (!modal || !modal.classList.contains('open') || !isWordAdmin()) return;
+  if (event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  const keyToDifficulty = { ArrowLeft: 'easy', ArrowDown: 'standard', ArrowRight: 'hard' };
+  const difficulty = keyToDifficulty[event.key];
+  if (!difficulty) return;
+  const rows = Array.from(document.querySelectorAll('#word-admin-list .word-admin-row'));
+  if (!rows.length) return;
+  if (rows.some(row => row.querySelector('button:disabled'))) return;
+  event.preventDefault();
+  const index = Math.max(0, Math.min(wordAdminKeyboardIndex, rows.length - 1));
+  const buttons = rows[index].querySelectorAll('.word-admin-difficulty-btn');
+  const choiceIndex = difficulty === 'easy' ? 1 : difficulty === 'standard' ? 2 : 3;
+  if (!buttons[choiceIndex] || buttons[choiceIndex].disabled) return;
+  wordAdminKeyboardIndex = Math.min(index + 1, rows.length - 1);
+  rows[index].querySelectorAll('.word-admin-difficulty-btn')[choiceIndex].click();
+});
 
 
 function startRoundStudy() {
