@@ -232,6 +232,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
   <div class="sync-spinner" aria-hidden="true"></div>
   <div id="sync-loading-title">学習データを準備しています</div>
   <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
+  <button id="sync-retry-btn" onclick="window.location.reload()" style="display:none;padding:10px 18px;border:0;border-radius:10px;background:#2a9d8f;color:white;font-weight:700;">再読み込みして再試行</button>
 </div>
 
 <!-- 🌟 モダンな2カラムログイン画面 -->
@@ -478,16 +479,28 @@ async function initDictionary() {
   } catch(e) { console.error("単語DB初期化エラー:", e); }
 }
 
+let syncWatchdog = null;
 function showSyncLoading(title, message) {
   const overlay = document.getElementById('sync-loading');
   const titleEl = document.getElementById('sync-loading-title');
   const messageEl = document.getElementById('sync-loading-message');
   if (titleEl && title) titleEl.textContent = title;
+  const retryBtn = document.getElementById('sync-retry-btn');
   if (messageEl && message) messageEl.textContent = message;
+  if (retryBtn) retryBtn.style.display = 'none';
   if (overlay) overlay.classList.remove('is-hidden');
+  if (syncWatchdog) clearTimeout(syncWatchdog);
+  syncWatchdog = setTimeout(() => {
+    if (overlay && !overlay.classList.contains('is-hidden')) {
+      if (titleEl) titleEl.textContent = '同期に時間がかかっています';
+      if (messageEl) messageEl.textContent = '通信が不安定か、Firebaseからの応答が止まっている可能性があります。再読み込みしてもう一度お試しください。';
+      if (retryBtn) retryBtn.style.display = 'inline-block';
+    }
+  }, 15000);
 }
 function hideSyncLoading() {
   const overlay = document.getElementById('sync-loading');
+  if (syncWatchdog) { clearTimeout(syncWatchdog); syncWatchdog = null; }
   if (overlay) overlay.classList.add('is-hidden');
 }
 
@@ -981,8 +994,11 @@ async function exitQuizDirect() {
 }
 
 // 👑 リーダーボード表示（進捗％ ＋ 正解率％ の新仕様！）
-function updateLeaderboardDisplay() {
+function updateLeaderboardDisplay(forceRefresh = false) {
   const homeLeaderboard = document.getElementById('home-leaderboard');
+  if (!homeLeaderboard) return;
+  const lastLoaded = Number(homeLeaderboard.dataset.loadedAt || 0);
+  if (!forceRefresh && lastLoaded && Date.now() - lastLoaded < 60000) return;
   if (isGuest) {
     homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>";
     return;
@@ -1003,6 +1019,10 @@ function updateLeaderboardDisplay() {
         <span><b style="color:#1976d2;">${e.currentRound}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
       </div>`;
     }).join('');
+    homeLeaderboard.dataset.loadedAt = String(Date.now());
+  }).catch(e => {
+    console.error('ランキング取得エラー:', e);
+    homeLeaderboard.innerHTML = '<span style="color:#888;">ランキングを読み込めませんでした。</span> <button onclick="updateLeaderboardDisplay(true)">再試行</button>';
   });
 }
 
