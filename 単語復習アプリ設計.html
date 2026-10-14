@@ -145,7 +145,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
 .stat-lbl { font-size: 11px; color: #888; font-weight: 600; margin-top: 4px; text-transform: uppercase; }
 .quiz-word { font-size: 32px; font-weight: 800; letter-spacing: -1px; text-align: center; padding: 1.5rem 1rem 0.5rem; color: #264653; }
 .quiz-hint { font-size: 14px; color: #888; text-align: center; margin-bottom: 1.5rem; }
-.text-input { width: 100%; padding: 16px; font-size: 16px; border: 2px solid #f0f0f0; border-radius: 12px; background: #fafafa; margin-bottom: 12px; transition: all 0.2s ease; outline: none; }
+.text-input { width: 100%; min-width: 0; padding: 16px; font-size: 16px; border: 2px solid #f0f0f0; border-radius: 12px; background: #fafafa; margin-bottom: 0; transition: all 0.2s ease; outline: none; }
+.quiz-answer-row { display:flex; gap:8px; align-items:stretch; margin-top:14px; }
+.quiz-answer-row .text-input { flex:1; }
+.quiz-answer-row .big-btn { flex:0 0 104px; width:auto; margin:0; padding:12px 8px; font-size:14px; }
+@media (max-width:360px) { .quiz-answer-row .big-btn { flex-basis:88px; font-size:13px; } }
 .text-input:focus { border-color: #2a9d8f; background: white; box-shadow: 0 0 0 4px rgba(42, 157, 143, 0.1); }
 .result-box { padding: 16px; border-radius: 12px; margin-bottom: 12px; font-size: 15px; font-weight: 600; }
 .result-correct { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
@@ -423,13 +427,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
       <div class="card">
         <div id="quiz-word" class="quiz-word"></div>
         <div id="quiz-hint" class="quiz-hint"></div>
-        <input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力（空欄OK）" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" onkeydown="if(event.key==='Enter' && !event.isComposing)submitAnswer()">
-        <div id="quiz-result" style="display:none;"></div>
+        <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();submitAnswer()}"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
+        <button class="big-btn btn-secondary" id="btn-reveal" onclick="revealAnswer()" style="margin-top:10px;margin-bottom:0;padding:11px;font-size:13px;">答えを見る</button>
+        <div id="quiz-result" style="display:none;margin-top:12px;"></div>
       </div>
-      <div style="position:relative;height:54px;">
-        <button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()" style="position:absolute;inset:0;width:100%;">解答する</button>
-        <button class="big-btn btn-secondary" id="btn-next" onclick="nextQuestion()" style="display:none;position:absolute;inset:0;width:100%;">次へ →</button>
-      </div>
+      <div id="quiz-tap-hint" style="text-align:center;color:#777;font-size:12px;margin-top:10px;">答えが出たら画面のどこをタップしても次へ進みます。</div>
     </div>
 
     <div class="screen" id="screen-result">
