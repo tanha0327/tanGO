@@ -1228,11 +1228,12 @@ async function submitAnswer(timedOut = false) {
   const ans = timedOut ? '' : document.getElementById('quiz-answer').value.trim().toLowerCase();
   const currentItem = state.queue[state.current];
   const correct = currentItem.word.en;
+  const normalizedCorrect = String(correct || '').trim().toLowerCase();
   const wordId = currentItem.word.id;
   
   let grade = 'wrong';
-  if (ans === correct) grade = 'correct';
-  else if (ans !== '' && (correct.includes(ans) || ans.includes(correct)) && ans.length > 2) grade = 'partial';
+  if (ans === normalizedCorrect) grade = 'correct';
+  else if (ans !== '' && (normalizedCorrect.includes(ans) || ans.includes(normalizedCorrect)) && ans.length > 2) grade = 'partial';
 
   state.results.push({ grade });
   
@@ -2248,11 +2249,12 @@ async function submitAnswer(timedOut = false) {
   if (!currentItem || !currentItem.word) return;
   const word = currentItem.word;
   const correct = word.en;
+  const normalizedCorrect = String(correct || '').trim().toLowerCase();
   const wordId = word.id;
 
   let grade = 'wrong';
-  if (ans === correct) grade = 'correct';
-  else if (ans !== '' && (correct.includes(ans) || ans.includes(correct)) && ans.length > 2) grade = 'partial';
+  if (ans === normalizedCorrect) grade = 'correct';
+  else if (ans !== '' && (normalizedCorrect.includes(ans) || ans.includes(normalizedCorrect)) && ans.length > 2) grade = 'partial';
 
   state.results.push({
     grade,
@@ -2632,7 +2634,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v3.9 (2学期中間の頭文字ヒント)"; 
+const APP_VERSION = "v4.0 (英単語の大文字小文字を区別しない採点)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
