@@ -416,7 +416,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-se
       <div class="card">
         <div id="quiz-word" class="quiz-word"></div>
         <div id="quiz-hint" class="quiz-hint"></div>
-        <input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力（空欄OK）" onkeydown="if(event.key==='Enter')submitAnswer()">
+        <input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力（空欄OK）" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" onkeydown="if(event.key==='Enter' && !event.isComposing)submitAnswer()">
         <div id="quiz-result" style="display:none;"></div>
       </div>
       <div style="position:relative;height:54px;">
