@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <!-- 超高画質＆滑らかな Lottie アニメーションライブラリ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+<script src="sentences-t2mid.js"></script>
 <script>
 // ==========================================
 // Firebase設定
@@ -49,6 +50,11 @@ let uTotalCorrect = 0;      // 通算正解数（正解率用）
 let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 
 const state = { queue: [], current: 0, results: [] };
+
+// 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
+function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : ''); }
+let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
+function escHtml(t) { return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 </script>
 
@@ -434,12 +440,13 @@ window.onload = () => {
           if (data.nickname) currentNickname = data.nickname;
           
           // 🔥 休み明けテスト(extra)が選ばれているなら、専用の白紙セーブデータを読み込む！
-          if (activeRange === 'extra') {
-            uCurrentRound = data.currentRound_extra || 1;
-            uRoundAnswers = data.roundAnswers_extra || [];
-            uTotalAnswers = data.totalAnswers_extra || 0;
-            uTotalCorrect = data.totalCorrect_extra || 0;
-            uWordHistory = data.wordHistory_extra || {};
+          if (rangeSuffix() !== '') {
+            const sfx = rangeSuffix();
+            uCurrentRound = data['currentRound' + sfx] || 1;
+            uRoundAnswers = data['roundAnswers' + sfx] || [];
+            uTotalAnswers = data['totalAnswers' + sfx] || 0;
+            uTotalCorrect = data['totalCorrect' + sfx] || 0;
+            uWordHistory = data['wordHistory' + sfx] || {};
           } else {
             // 中間や期末の場合は、これまでの過去のセーブデータをそのままロード
             if (data.currentRound !== undefined) uCurrentRound = data.currentRound;
@@ -639,8 +646,16 @@ function renderQuestion() {
   const w = state.queue[state.current].word;
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
-  document.getElementById('quiz-word').textContent = w.jp;
-  document.getElementById('quiz-hint').textContent = `No.${w.id} — 英語で答えてください`;
+  if (w.sentence) {
+    // 📝 文章題：英文の空所に入る単語を答える
+    document.getElementById('quiz-word').innerHTML =
+      `<div style="font-size:20px;line-height:1.6;font-weight:600;">${escHtml(w.sentence)}</div>` +
+      `<div style="font-size:14px;line-height:1.5;color:#666;margin-top:10px;font-weight:400;">${escHtml(w.sentenceJp || '')}</div>`;
+    document.getElementById('quiz-hint').textContent = `No.${w.id} — ( ____ ) に入る英単語を答えてください`;
+  } else {
+    document.getElementById('quiz-word').textContent = w.jp;
+    document.getElementById('quiz-hint').textContent = `No.${w.id} — 英語で答えてください`;
+  }
   document.getElementById('quiz-answer').value = '';
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
@@ -998,6 +1013,7 @@ function getActiveRangeInfo() {
   if (activeRange === 'midterm') return { lo: 0, hi: 140, total: 141, name: "中間範囲" };
   if (activeRange === 'final') return { lo: 141, hi: 282, total: 142, name: "期末範囲" };
   if (activeRange === 'extra') return { lo: 283, hi: 618, total: 336, name: "休み明け範囲" };
+  if (activeRange === 't2mid') { const n = (window.SENTENCES_T2MID || []).length; return { lo: T2MID_LO, hi: T2MID_LO + n - 1, total: n, name: "2学期中間範囲(文章題)" }; }
   return { lo: 0, hi: 0, total: 0, name: "" };
 }
 
@@ -1015,6 +1031,11 @@ async function initDictionary() {
 
     // Firebaseから取ってきた単語をすべて合体！
     ALL_WORDS = [...midWords, ...finWords, ...extWords];
+
+    // 🌟 2学期中間(文章題)：コード側のデータを末尾に追加。意味(jp)は同じ番号の単語があれば流用
+    T2MID_LO = ALL_WORDS.length;
+    const jpById = {}; ALL_WORDS.forEach(w => { if (w.jp) jpById[w.id] = w.jp; });
+    (window.SENTENCES_T2MID || []).forEach(x => ALL_WORDS.push({ id: x.id, en: x.en, jp: jpById[x.id] || '', sentence: x.sentence, sentenceJp: x.sentenceJp }));
     
     // 🌟 記号のお掃除（Firebaseから読み込んだ後に自動実行）
     ALL_WORDS.forEach(w => {
@@ -1088,8 +1109,7 @@ function startRoundStudy() {
     uCurrentRound++; uRoundAnswers = [];
     if (!isGuest && auth.currentUser) {
       const updates = {};
-      if (activeRange === 'extra') { updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers; } 
-      else { updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers; }
+      { const sfx = rangeSuffix(); updates['currentRound' + sfx] = uCurrentRound; updates['roundAnswers' + sfx] = uRoundAnswers; }
       db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
     }
     refreshUI(); return;
@@ -1138,19 +1158,16 @@ async function submitAnswer() {
   const cls = grade==='correct'?'result-correct':grade==='partial'?'result-partial':'result-wrong';
   const lbl = grade==='correct'?'✓ 正解！':grade==='partial'?'△ 部分正解':'✗ 不正解';
   const resEl = document.getElementById('quiz-result');
-  resEl.innerHTML = `<div class="result-box ${cls}"><strong>${lbl}</strong><br>模範解答: <strong>${correct}</strong></div>`; resEl.style.display = 'block';
+  resEl.innerHTML = `<div class="result-box ${cls}"><strong>${lbl}</strong><br>模範解答: <strong>${correct}</strong>${currentItem.word.sentence ? `<br><span style="font-size:13px;color:#333;">${escHtml(currentItem.word.sentence.replace('( ____ )', correct))}</span>` : ''}${currentItem.word.sentence && currentItem.word.jp ? `<br><span style="font-size:12px;color:#666;">意味: ${escHtml(currentItem.word.jp)}</span>` : ''}</div>`; resEl.style.display = 'block';
   document.getElementById('quiz-answer').disabled = true; document.getElementById('btn-submit').style.display = 'none'; document.getElementById('btn-next').style.display = 'block';
 
   if (!isGuest && auth.currentUser) {
     const updates = {};
-    if (activeRange === 'extra') {
-      updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers;
-      updates.totalAnswers_extra = uTotalAnswers; updates.totalCorrect_extra = uTotalCorrect;
-      updates.wordHistory_extra = uWordHistory;
-    } else {
-      updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers;
-      updates.totalAnswers = uTotalAnswers; updates.totalCorrect = uTotalCorrect;
-      updates.wordHistory = uWordHistory;
+    {
+      const sfx = rangeSuffix();
+      updates['currentRound' + sfx] = uCurrentRound; updates['roundAnswers' + sfx] = uRoundAnswers;
+      updates['totalAnswers' + sfx] = uTotalAnswers; updates['totalCorrect' + sfx] = uTotalCorrect;
+      updates['wordHistory' + sfx] = uWordHistory;
     }
     updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
@@ -1161,7 +1178,7 @@ async function submitAnswer() {
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
     
     // 🌟 ランキングも休み明け専用データベース「leaderboard_extra」へ隔離！
-    const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+    const lbCol = 'leaderboard' + rangeSuffix();
     db.collection(lbCol).doc(auth.currentUser.uid).set({
       uid: auth.currentUser.uid, displayName: nameToSave, email: auth.currentUser.email, progressPercent: accumulatedProgress, currentRound: uCurrentRound,
       roundProgress: Math.floor((uRoundAnswers.length / info.total) * 100), accuracy: totalAccuracy, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1182,8 +1199,7 @@ function finishQuizSession() {
       uCurrentRound++; uRoundAnswers = [];
       if (!isGuest && auth.currentUser) {
         const updates = {};
-        if (activeRange === 'extra') { updates.currentRound_extra = uCurrentRound; updates.roundAnswers_extra = uRoundAnswers; } 
-        else { updates.currentRound = uCurrentRound; updates.roundAnswers = uRoundAnswers; }
+        { const sfx = rangeSuffix(); updates['currentRound' + sfx] = uCurrentRound; updates['roundAnswers' + sfx] = uRoundAnswers; }
         db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
       }
       showScreen('screen-result');
@@ -1219,7 +1235,7 @@ function tickCountdown() {
 function updateLeaderboardDisplay() {
   const homeLeaderboard = document.getElementById('home-leaderboard');
   if (isGuest) { homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>"; return; }
-  const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+  const lbCol = 'leaderboard' + rangeSuffix();
   db.collection(lbCol).orderBy('progressPercent', 'desc').limit(3).get().then(snapshot => {
     if (snapshot.empty) { homeLeaderboard.innerHTML = "まだデータがありません。一番乗りを目指そう！"; return; }
     let i = 0;
@@ -1234,7 +1250,7 @@ function updateLeaderboardDisplay() {
 
 function openLeaderboardModal() {
   document.getElementById('leaderboard-modal').classList.add('open'); const boardEl = document.getElementById('leaderboard-content-full'); boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
-  const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+  const lbCol = 'leaderboard' + rangeSuffix();
   db.collection(lbCol).orderBy('progressPercent', 'desc').get().then(snapshot => {
     if(snapshot.empty) { boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>"; return; } let i = 0;
     boardEl.innerHTML = snapshot.docs.map(doc => {
@@ -1248,7 +1264,7 @@ async function saveNickname() {
   if (!isGuest && auth.currentUser) {
     try { 
       await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true }); currentNickname = newName; document.getElementById('user-info').textContent = `👤 ${newName}`; document.getElementById('nickname-modal').classList.remove('open'); 
-      const lbCol = (activeRange === 'extra') ? 'leaderboard_extra' : 'leaderboard';
+      const lbCol = 'leaderboard' + rangeSuffix();
       db.collection(lbCol).doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true }); refreshUI(); 
     } catch(e) {}
   }
@@ -1265,6 +1281,16 @@ window.addEventListener('DOMContentLoaded', () => {
       if(d) { setAndSaveSharedTest("休み明けテスト", new Date(d).toISOString(), 'extra'); }
     };
     adminBtn.parentNode.insertBefore(btn, adminBtn.nextSibling);
+
+    // 📝 2学期中間テスト(文章題 1684〜1826)を全員にセット
+    const btn2 = document.createElement('button');
+    btn2.textContent = "⚙️ [管理者] 2学期中間(文章題 1684〜1826)を全員にセット";
+    btn2.style = "margin-top:10px; padding:8px; background:#7b1fa2; color:white; border-radius:8px; border:none; width:100%; cursor:pointer; font-weight:bold;";
+    btn2.onclick = () => {
+      const d = prompt("テストの日時を YYYY-MM-DDTHH:MM の形式で入力してください\n(例: 2026-10-23T09:00)", "");
+      if (d) { setAndSaveSharedTest("2学期中間テスト(文章題)", new Date(d).toISOString(), 't2mid'); }
+    };
+    btn.parentNode.insertBefore(btn2, btn.nextSibling);
   }
 });
 
@@ -1273,7 +1299,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.1 (新型Lottieロゴ版)"; 
+const APP_VERSION = "v2.2 (2学期中間 文章題版)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
