@@ -605,14 +605,14 @@ window.__tangoInitialWatchdog = setTimeout(() => {
 
     <div class="screen" id="screen-quiz">
       <div class="quiz-header">
-        <div style="display:flex;align-items:center;gap:8px;"><span id="quiz-counter" style="font-size:13px;color:#888;"></span><span id="quiz-timer" style="font-size:13px;font-weight:800;color:#264653;background:#e9c46a;padding:7px 10px;border-radius:10px;white-space:nowrap;">10秒</span></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span id="quiz-counter" style="font-size:13px;color:#888;"></span><span id="quiz-timer" style="font-size:13px;font-weight:800;color:#264653;background:#e9c46a;padding:7px 10px;border-radius:10px;white-space:nowrap;">20秒</span></div>
         <button class="exit-btn" onclick="event.stopPropagation();document.getElementById('exit-modal').classList.add('open')">✕ 保存して退出</button>
       </div>
       <div class="progress-wrap"><div class="progress-bar" id="quiz-progress" style="width:0%"></div></div>
       <div class="card">
         <div id="quiz-word" class="quiz-word"></div>
         <div id="quiz-hint" class="quiz-hint"></div>
-        <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();submitAnswer()}"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
+        <div class="quiz-answer-row"><input type="text" id="quiz-answer" class="text-input" placeholder="解答を入力" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" lang="en" enterkeyhint="done" onkeydown="if(event.key==='Enter' && !event.isComposing){event.preventDefault();if(questionAnswered){nextQuestion()}else{submitAnswer()}}"><button class="big-btn btn-primary" id="btn-submit" onclick="submitAnswer()">回答する</button></div>
         <div id="quiz-result" style="display:none;margin-top:12px;"></div>
       </div>
       <div id="quiz-tap-hint" style="text-align:center;color:#777;font-size:12px;margin-top:10px;">答えが出たら画面のどこをタップしても次へ進みます。</div>
@@ -1049,9 +1049,9 @@ function startReviewMode() {
 }
 
 let questionTimer = null;
-let questionSecondsLeft = 10;
+let questionSecondsLeft = 20;
 let questionAnswered = false;
-const QUESTION_TIME_LIMIT = 10;
+const QUESTION_TIME_LIMIT = 20;
 function stopQuestionTimer() { if (questionTimer) { clearInterval(questionTimer); questionTimer = null; } }
 function startQuestionTimer() {
   stopQuestionTimer(); questionSecondsLeft = QUESTION_TIME_LIMIT;
@@ -1084,9 +1084,15 @@ function renderQuestion() {
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
-  document.getElementById('quiz-tap-hint').textContent = '制限時間内に回答。答えが出たら画面のどこをタップしても次へ進みます。';
+  document.getElementById('quiz-tap-hint').textContent = '20秒以内に回答。Enterキーで回答し、答えが出た後はEnterキーで次へ進みます。';
+  // 問題ごとに入力欄へフォーカスし、スマホでもすぐ入力できるようにする。
+  const answerInput = document.getElementById('quiz-answer');
+  requestAnimationFrame(() => {
+    if (!questionAnswered && document.getElementById('screen-quiz').classList.contains('visible')) {
+      answerInput.focus({ preventScroll: true });
+    }
+  });
   startQuestionTimer();
-  // 自動フォーカスを外し、スマホでキーボードが勝手に開くのを防ぐ。
 }
 
 // 🌟 解答が送信された瞬間に、裏でクラウドデータベースへリアルタイム保存！
@@ -1134,11 +1140,15 @@ async function submitAnswer(timedOut = false) {
   const resEl = document.getElementById('quiz-result');
   resEl.innerHTML = `<div class="result-box ${cls}"><strong>${lbl}</strong><br>模範解答: <strong>${correct}</strong></div>`;
   resEl.style.display = 'block';
+  // 時間切れ・正誤表示が画面下に隠れないよう、結果を表示位置までスクロールする。
+  requestAnimationFrame(() => {
+    resEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
   
   document.getElementById('quiz-answer').disabled = true;
   document.getElementById('btn-submit').style.display = 'none';
   document.getElementById('quiz-timer').textContent = timedOut ? '時間切れ' : '回答済み';
-  document.getElementById('quiz-tap-hint').textContent = '画面のどこをタップしても次の問題へ進みます。';
+  document.getElementById('quiz-tap-hint').textContent = 'Enterキーで次の問題へ進みます（スマホは画面をタップしてもOK）。';
 
   // 2. ☁️ 即座に個人のFirestoreデータベースに完全バックアップ送信！
   if (!isGuest && auth.currentUser) {
@@ -1188,6 +1198,8 @@ if (!window.__tangoQuizTapHandlerInstalled) {
 }
 function nextQuestion() {
   if (!questionAnswered) return;
+  // 次の問題へ進むときは画面上部へ戻す。
+  window.scrollTo({ top: 0, behavior: 'auto' });
   state.current++;
   if (state.current >= state.queue.length) {
     // 全問題を解き終わった時
