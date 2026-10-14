@@ -1396,11 +1396,19 @@ function renderQuestion() {
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
   document.getElementById('quiz-tap-hint').textContent = '20秒以内に回答。Enterキーで回答し、答えが出た後はEnterキーで次へ進みます。';
-  // 問題ごとに入力欄へフォーカスし、スマホでもすぐ入力できるようにする。
+  // 問題ごとに入力欄へフォーカス。iPhoneでキーボードが出た際、
+  // preventScroll:true によって画面が固定される問題を避け、入力欄を見える位置へ移動する。
   const answerInput = document.getElementById('quiz-answer');
   requestAnimationFrame(() => {
     if (!questionAnswered && document.getElementById('screen-quiz').classList.contains('visible')) {
-      answerInput.focus({ preventScroll: true });
+      answerInput.focus();
+      // iOSはキーボード表示後にビューポートの高さが変わるため、少し待ってから再調整する。
+      setTimeout(() => {
+        if (!questionAnswered && document.activeElement === answerInput &&
+            document.getElementById('screen-quiz').classList.contains('visible')) {
+          answerInput.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        }
+      }, 300);
     }
   });
   startQuestionTimer();
@@ -2843,7 +2851,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v4.6 (レポートの単語別結果を折りたたみ表示)"; 
+const APP_VERSION = "v4.7 (iPhoneキーボード表示時の位置調整)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
