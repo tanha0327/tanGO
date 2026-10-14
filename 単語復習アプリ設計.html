@@ -2066,6 +2066,7 @@ function startRandomN() {
   initializeDifficultyProgress();
   const progress = uDifficultyProgress[randomDifficulty];
   const complete = candidates.length > 0 && candidates.every(w => progress.answered.some(id => String(id) === String(w.id)));
+  let advancedDifficultyRound = false;
   if (complete) {
     if (!allDifficultyLevelsCompletedRound(progress.round, rangeWords)) {
       alert('このレベルの周回は完了しています。基礎・標準・挑戦の残りのレベルも一周してから、次の周回に進めます。');
@@ -2074,6 +2075,7 @@ function startRandomN() {
     }
     progress.round += 1;
     progress.answered = [];
+    advancedDifficultyRound = true;
   }
   const available = getRandomDifficultyWords(rangeWords);
   if (!available.length) {
@@ -2087,6 +2089,12 @@ function startRandomN() {
   state.current = 0; state.results = [];
   document.getElementById('random-modal').classList.remove('open');
   saveDifficultyProgressLocal();
+  if (advancedDifficultyRound && !isGuest && auth.currentUser) {
+    const updates = {};
+    persistDifficultyProgress(updates);
+    db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true })
+      .catch(e => console.error('難易度別周回の同期に失敗:', e));
+  }
   playTangoEffect(() => { showScreen('screen-quiz'); renderQuestion(); });
 }
 
