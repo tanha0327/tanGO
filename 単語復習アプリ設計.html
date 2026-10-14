@@ -1985,13 +1985,81 @@ function openLeaderboardModal(forceRefresh = false) {
 }
 
 async function saveNickname() {
-  const newName = document.getElementById('nickname-input').value.trim(); if (!newName) { alert("ニックネームを入力してください"); return; }
-  if (!isGuest && auth.currentUser) {
-    try { 
-      await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true }); currentNickname = newName; document.getElementById('user-info').textContent = `👤 ${newName}`; document.getElementById('nickname-modal').classList.remove('open'); 
-      const lbCol = 'leaderboard' + rangeSuffix();
-      db.collection(lbCol).doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true }); refreshUI(); 
-    } catch(e) {}
+  const input = document.getElementById('nickname-input');
+  const newName = input ? input.value.trim() : '';
+  if (!newName) {
+    alert('ニックネームを入力してください。');
+    return;
+  }
+  const user = auth.currentUser;
+  if (isGuest || !user) {
+    alert('ゲストではニックネームをクラウドに保存できません。Googleログイン後に変更してください。');
+    return;
+  }
+
+  const saveButton = document.querySelector('button[onclick="saveNickname()"]');
+  if (saveButton) { saveButton.disabled = true; saveButton.textContent = '保存中…'; }
+
+  try {
+    // アカウントのニックネームを先に保存する
+    await db.collection('users').doc(user.uid).set({ nickname: newName }, { merge: true });
+    currentNickname = newName;
+    const userInfo = document.getElementById('user-info');
+    if (userInfo) userInfo.textContent = '👤 ' + newName;
+    const nicknameModal = document.getElementById('nickname-modal');
+    if (nicknameModal) nicknameModal.classList.remove('open');
+
+    // ランキングは範囲ごとに別コレクションなので、既存の本人レコードも同期する
+    const currentLeaderboard = 'leaderboard' + rangeSuffix();
+    const leaderboardCollections = [...new Set([
+      'leaderboard',
+      'leaderboard_t2mid',
+      'leaderboard_extra',
+      'leaderboard_midterm',
+      currentLeaderboard
+    ])];
+    const failures = [];
+
+    await Promise.all(leaderboardCollections.map(async collectionName => {
+      const ref = db.collection(collectionName).doc(user.uid);
+      try {
+        const snapshot = await ref.get();
+        if (snapshot.exists) {
+          await ref.set({ displayName: newName }, { merge: true });
+        } else if (collectionName === currentLeaderboard) {
+          const info = getActiveRangeInfo();
+          const progressPercent = (uCurrentRound - 1) * 100 +
+            (uRoundAnswers.length / Math.max(1, info.total)) * 100;
+          const accuracy = uTotalAnswers > 0 ? Math.round(uTotalCorrect / uTotalAnswers * 100) : 0;
+          await ref.set({
+            uid: user.uid,
+            displayName: newName,
+            email: user.email || '',
+            progressPercent,
+            currentRound: uCurrentRound,
+            roundProgress: Math.floor(uRoundAnswers.length / Math.max(1, info.total) * 100),
+            accuracy,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+      } catch (error) {
+        failures.push(collectionName);
+        console.error('ランキング名の同期に失敗 (' + collectionName + '):', error);
+      }
+    }));
+
+    refreshUI();
+    if (failures.length) {
+      alert('アカウントのニックネームは保存しましたが、一部ランキングの名前を更新できませんでした：' +
+        failures.join('、') + '。Firestoreのルールを確認してください。');
+    } else {
+      alert('ニックネームを保存しました！');
+    }
+  } catch (error) {
+    console.error('ニックネーム保存エラー:', error);
+    alert('ニックネームを保存できませんでした。通信状態とFirestoreのセキュリティルールを確認してください。');
+  } finally {
+    if (saveButton) { saveButton.disabled = false; saveButton.textContent = '保存して同期'; }
   }
 }
 
@@ -2028,7 +2096,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v2.8 (読み込み進捗表示)"; 
+const APP_VERSION = "v2.9 (ニックネーム同期修正)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
