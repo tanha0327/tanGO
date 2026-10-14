@@ -953,9 +953,14 @@ function finishQuizSession() {
 }
 
 // 💾 現在の学習データを保存してホームへ戻る
-async function exitQuizDirect() {
+async async function exitQuizDirect() {
   const exitBtn = document.getElementById('btn-save-exit');
   if (exitBtn) { exitBtn.disabled = true; exitBtn.textContent = '保存中…'; }
+  let saveTimedOut = false;
+  const withSaveTimeout = promise => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => { saveTimedOut = true; reject(new Error('保存がタイムアウトしました')); }, 10000))
+  ]);
   try {
     if (!isGuest && auth.currentUser) {
       const sfx = rangeSuffix();
@@ -966,13 +971,13 @@ async function exitQuizDirect() {
       updates['totalCorrect' + sfx] = uTotalCorrect;
       updates['wordHistory' + sfx] = uWordHistory;
       updates.lastActive = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true });
+      await withSaveTimeout(db.collection('users').doc(auth.currentUser.uid).set(updates, { merge: true }));
 
       const info = getActiveRangeInfo();
       const accumulatedProgress = ((uCurrentRound - 1) * 100) + ((uRoundAnswers.length / Math.max(1, info.total)) * 100);
       const totalAccuracy = uTotalAnswers > 0 ? Math.round((uTotalCorrect / uTotalAnswers) * 100) : 0;
       const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
-      await db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
+      await withSaveTimeout(db.collection('leaderboard' + sfx).doc(auth.currentUser.uid).set({
         uid: auth.currentUser.uid,
         displayName: nameToSave,
         email: auth.currentUser.email,
@@ -981,13 +986,22 @@ async function exitQuizDirect() {
         roundProgress: Math.floor((uRoundAnswers.length / Math.max(1, info.total)) * 100),
         accuracy: totalAccuracy,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      }, { merge: true }));
     }
     document.getElementById('exit-modal').classList.remove('open');
     showScreen('screen-home');
     refreshUI();
+    if (saveTimedOut) alert('保存の応答が遅れています。ホームには戻りましたが、通信が戻ったら学習データを確認してください。');
   } catch (e) {
-    alert('保存に失敗しました。通信状態を確認して、もう一度お試しください。');
+    console.error('学習データ保存エラー:', e);
+    if (saveTimedOut) {
+      document.getElementById('exit-modal').classList.remove('open');
+      showScreen('screen-home');
+      refreshUI();
+      alert('保存の応答が10秒以内に返りませんでした。ホームに戻りましたが、最新の学習データが同期されていない可能性があります。通信を確認してください。');
+    } else {
+      alert('保存に失敗しました。通信状態を確認して、もう一度お試しください。');
+    }
   } finally {
     if (exitBtn) { exitBtn.disabled = false; exitBtn.textContent = '💾 保存して退出'; }
   }
@@ -1457,54 +1471,153 @@ function finishQuizSession() {
 }
 
 function tickCountdown() {
-  const labelEl = document.getElementById('countdown-label'); const daysEl = document.getElementById('countdown-days');
-  const hmsEl = document.getElementById('countdown-hms'); const normaEl = document.getElementById('norma-area');
-  if (!testDate) return; 
-  const now = new Date(); const diff = testDate - now; 
+  const labelEl = document.getElementById('countdown-label');
+  const daysEl = document.getElementById('countdown-days');
+  const hmsEl = document.getElementById('countdown-hms');
+  const normaEl = document.getElementById('norma-area');
+  if (!testDate || !labelEl || !daysEl || !hmsEl || !normaEl) return;
+
+  const now = new Date();
+  const diff = testDate - now;
   const info = getActiveRangeInfo();
-  
+  const daysWrap = daysEl.parentElement;
+  const pad = n => String(n).padStart(2, '0');
+
   if (diff <= 0) {
-    labelEl.textContent = `${info.name} 当日！`; daysEl.textContent = '0'; hmsEl.textContent = '00:00:00';
-    normaEl.innerHTML = '<div class="norma-badge">🎯 本番開始！全力で行こう！</div>'; return;
+    labelEl.textContent = `${info.name} 当日！`;
+    if (daysWrap) daysWrap.style.display = 'none';
+    hmsEl.textContent = '00:00:00';
+    normaEl.innerHTML = '<div class="norma-badge">🎯 本番開始！全力で行こう！</div>';
+    return;
   }
-  
-  const totalSec = Math.floor(diff / 1000); const days = Math.floor(totalSec / 86400);
-  const hours = Math.floor((totalSec % 86400) / 3600); const mins = Math.floor((totalSec % 3600) / 60); const secs = totalSec % 60;
-  const pad = n => String(n).padStart(2,'0');
-  
+
+  const totalSec = Math.floor(diff / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+
   labelEl.textContent = `${info.name}まで（${testDate.getMonth()+1}/${testDate.getDate()} ${pad(testDate.getHours())}:${pad(testDate.getMinutes())}）`;
-  daysEl.textContent = days; hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
-  
+  if (daysWrap) daysWrap.style.display = days > 0 ? 'flex' : 'none';
+  daysEl.textContent = days;
+  hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+
   const remaining = Math.max(0, info.total - uRoundAnswers.length);
   const norma = Math.ceil(remaining / (days + 1));
   normaEl.innerHTML = `<div class="norma-badge">📚 今日の残りノルマ: ${norma}語 / 日 (範囲内未回答: ${remaining}語)</div>`;
 }
 
 // 🌟 ランキングの読み込み先も範囲に合わせて自動切り替え
-function updateLeaderboardDisplay() {
+function updateLeaderboardDisplay(forceRefresh = false) {
   const homeLeaderboard = document.getElementById('home-leaderboard');
-  if (isGuest) { homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>"; return; }
-  const lbCol = 'leaderboard' + rangeSuffix();
-  db.collection(lbCol).orderBy('progressPercent', 'desc').limit(3).get().then(snapshot => {
-    if (snapshot.empty) { homeLeaderboard.innerHTML = "まだデータがありません。一番乗りを目指そう！"; return; }
-    let i = 0;
-    homeLeaderboard.innerHTML = snapshot.docs.map(doc => {
-      const e = doc.data(); const rankEmoji = i===0?'👑':i===1?'🥈':'🥉'; i++;
-      return `<div style="padding:6px; background:${i===1?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
-        <span>${rankEmoji} ${i}. <b>${e.displayName}</b></span><span><b style="color:#1976d2;">${e.currentRound}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
-      </div>`;
-    }).join('');
+  if (!homeLeaderboard) return;
+  if (isGuest) {
+    homeLeaderboard.innerHTML = "<span style='color:#888;'>ランキングを見るにはログインが必要です</span>";
+    return;
+  }
+  const now = Date.now();
+  if (!forceRefresh && homeLeaderboard.dataset.loadedAt && now - Number(homeLeaderboard.dataset.loadedAt) < 60000) return;
+
+  homeLeaderboard.innerHTML = "<span style='color:#888;'>🏆 ランキングを読み込んでいます…</span>";
+  const rangeKey = rangeSuffix() || '_default';
+  const cache = window.__tangoLeaderboardCache || (window.__tangoLeaderboardCache = {});
+  const render = rows => {
+    if (!rows.length) {
+      homeLeaderboard.innerHTML = "まだデータがありません。一番乗りを目指そう！";
+    } else {
+      homeLeaderboard.innerHTML = rows.slice(0, 3).map((e, index) => {
+        const rankEmoji = index === 0 ? '👑' : index === 1 ? '🥈' : '🥉';
+        return `<div style="padding:6px; background:${index===0?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
+          <span>${rankEmoji} ${index + 1}. <b>${escapeLeaderboardText(e.displayName || '名無し')}</b></span>
+          <span><b style="color:#1976d2;">${e.currentRound || 1}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
+        </div>`;
+      }).join('');
+    }
+    homeLeaderboard.dataset.loadedAt = String(Date.now());
+  };
+  const useRows = rows => render(rows);
+  const cached = cache[rangeKey];
+  if (!forceRefresh && cached && cached.rows && Date.now() - cached.at < 60000) {
+    useRows(cached.rows);
+    return;
+  }
+  const request = cached && cached.promise && !forceRefresh
+    ? cached.promise
+    : db.collection('leaderboard' + rangeSuffix()).orderBy('progressPercent', 'desc').limit(10).get()
+        .then(snapshot => {
+          const rows = snapshot.docs.map(doc => doc.data());
+          cache[rangeKey] = { rows, at: Date.now() };
+          return rows;
+        });
+  cache[rangeKey] = { ...(cache[rangeKey] || {}), promise: request };
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (!settled) homeLeaderboard.innerHTML = '<span style="color:#888;">ランキングの応答に時間がかかっています。<button onclick="updateLeaderboardDisplay(true)">再試行</button></span>';
+  }, 8000);
+  request.then(rows => {
+    settled = true;
+    clearTimeout(timeout);
+    useRows(rows);
+  }).catch(e => {
+    settled = true;
+    clearTimeout(timeout);
+    console.error('ホームランキング取得エラー:', e);
+    homeLeaderboard.innerHTML = '<span style="color:#888;">ランキングを読み込めませんでした。<button onclick="updateLeaderboardDisplay(true)">再試行</button></span>';
+    if (cache[rangeKey]) delete cache[rangeKey].promise;
   });
 }
 
-function openLeaderboardModal() {
-  document.getElementById('leaderboard-modal').classList.add('open'); const boardEl = document.getElementById('leaderboard-content-full'); boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
-  const lbCol = 'leaderboard' + rangeSuffix();
-  db.collection(lbCol).orderBy('progressPercent', 'desc').get().then(snapshot => {
-    if(snapshot.empty) { boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>"; return; } let i = 0;
-    boardEl.innerHTML = snapshot.docs.map(doc => {
-      const e = doc.data(); i++; return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><div><div style="font-weight:bold;">${i}. ${e.displayName}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div><div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound}周目 ${e.roundProgress || 0}%</div></div></div>`;
-    }).join('');
+function openLeaderboardModal(forceRefresh = false) {
+  const modal = document.getElementById('leaderboard-modal');
+  const boardEl = document.getElementById('leaderboard-content-full');
+  if (!modal || !boardEl) return;
+  modal.classList.add('open');
+  if (isGuest) {
+    boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>ランキングを見るにはログインが必要です</div>";
+    return;
+  }
+  const rangeKey = rangeSuffix() || '_default';
+  const cache = window.__tangoLeaderboardCache || (window.__tangoLeaderboardCache = {});
+  const cached = cache[rangeKey];
+  const render = rows => {
+    if (!rows.length) {
+      boardEl.innerHTML = "<div style='text-align:center;padding:20px;'>データがありません</div>";
+    } else {
+      boardEl.innerHTML = rows.map((e, index) => `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+        <div><div style="font-weight:bold;">${index + 1}. ${escapeLeaderboardText(e.displayName || '名無し')}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div>
+        <div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound || 1}周目 ${e.roundProgress || 0}%</div></div>
+      </div>`).join('');
+    }
+    boardEl.dataset.loadedAt = String(Date.now());
+  };
+  if (!forceRefresh && cached && cached.rows && Date.now() - cached.at < 60000) {
+    render(cached.rows);
+    return;
+  }
+  boardEl.innerHTML = "<div style='text-align:center;color:#888;padding:20px;'>☁️ 取得中...</div>";
+  const request = cached && cached.promise && !forceRefresh
+    ? cached.promise
+    : db.collection('leaderboard' + rangeSuffix()).orderBy('progressPercent', 'desc').limit(10).get()
+        .then(snapshot => {
+          const rows = snapshot.docs.map(doc => doc.data());
+          cache[rangeKey] = { rows, at: Date.now() };
+          return rows;
+        });
+  cache[rangeKey] = { ...(cache[rangeKey] || {}), promise: request };
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (!settled) boardEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">読み込みに時間がかかっています。通信を確認して再試行してください。<br><button onclick="openLeaderboardModal(true)">再試行</button></div>';
+  }, 8000);
+  request.then(rows => {
+    settled = true;
+    clearTimeout(timeout);
+    render(rows);
+  }).catch(e => {
+    settled = true;
+    clearTimeout(timeout);
+    console.error('ランキング詳細取得エラー:', e);
+    boardEl.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">ランキングを読み込めませんでした。<br><button onclick="openLeaderboardModal(true)">再試行</button></div>';
+    if (cache[rangeKey]) delete cache[rangeKey].promise;
   });
 }
 
