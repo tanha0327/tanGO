@@ -63,7 +63,19 @@ const RANGE_OPTIONS = [
 ];
 const DEFAULT_RANGE = 't2mid';
 function getSavedRange() {
-  try { const v = localStorage.getItem('tango_selected_range'); if (RANGE_OPTIONS.some(o => o.key === v)) return v; } catch (e) {}
+  try {
+    const v = localStorage.getItem('tango_selected_range');
+    // 旧バージョンでは一学期期末が初期値だったため、初回だけ2学期中間へ移行。
+    // 移行後にユーザーが選んだ範囲は、次回以降もそのまま保持する。
+    const migrationKey = 'tango_default_range_migrated_v2';
+    if (!localStorage.getItem(migrationKey)) {
+      if (!v || v === 'final') localStorage.setItem('tango_selected_range', DEFAULT_RANGE);
+      localStorage.setItem(migrationKey, '1');
+      const migrated = localStorage.getItem('tango_selected_range');
+      if (RANGE_OPTIONS.some(o => o.key === migrated)) return migrated;
+    }
+    if (RANGE_OPTIONS.some(o => o.key === v)) return v;
+  } catch (e) {}
   return DEFAULT_RANGE;
 }
 function openRangeModal() {
@@ -1076,7 +1088,9 @@ function logout() { auth.signOut().then(() => window.location.reload()); }
 function loginAsGuest() {
   isGuest = true; document.getElementById('user-info').textContent = "👤 ゲストユーザー";
   document.getElementById('login-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
-  testDate = new Date("2026-07-03T09:10:00"); activeRange = "final";
+  activeRange = getSavedRange();
+  const guestRangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
+  testDate = guestRangeOpt && guestRangeOpt.testDate ? new Date(guestRangeOpt.testDate) : null;
   startCountdown(); refreshUI();
 }
 
