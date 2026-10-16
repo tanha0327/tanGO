@@ -2366,6 +2366,11 @@ function refreshUI() {
     mainBtn.textContent = `${uCurrentRound}周目の続きから再開 (残り${remain}問)`;
   }
   
+  try { renderWordAccuracyRanking(); } catch (e) {
+    console.error('単語別正解率ランキングの描画エラー:', e);
+    const rankingEl = document.getElementById('word-accuracy-ranking');
+    if (rankingEl) rankingEl.innerHTML = '<span class="lb-empty">ランキングの表示に失敗しました。ページを再読み込みしてください。</span>';
+  }
   updateLeaderboardDisplay();
 
   if (ALL_WORDS && ALL_WORDS.length > 0) {
