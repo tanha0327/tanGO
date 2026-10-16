@@ -385,6 +385,9 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 
 /* ---------- home: top bar ---------- */
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.theme-btn { width: 36px; height: 36px; flex: none; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--line-2); border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
+.theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .user-chip { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 700; }
 .user-chip::before { content: ""; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--pink); }
 #user-info { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -987,7 +990,10 @@ window.__tangoInitialWatchdog = setTimeout(() => {
           <span id="user-info"></span>
           <button id="btn-edit-nickname" class="chip-btn" style="display:none;" onclick="openNicknameModal()">編集</button>
         </div>
-        <button class="exit-btn" onclick="logout()">ログアウト</button>
+        <div class="topbar-actions">
+          <button id="btn-theme" class="theme-btn" type="button" onclick="toggleThemeManual()" aria-label="ライト/ダーク表示を切り替え" title="ライト/ダーク切り替え"></button>
+          <button class="exit-btn" onclick="logout()">ログアウト</button>
+        </div>
       </div>
 
       <section class="hero" id="countdown-card">
@@ -3273,15 +3279,55 @@ function openExternalBrowser() {
     return { sunrise: solarNoon - 4 * hourAngle, sunset: solarNoon + 4 * hourAngle };
   }
 
+  const SUN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  const MOON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+  function getManualTheme() {
+    try { const v = localStorage.getItem('tango_theme'); return v === 'light' || v === 'dark' ? v : ''; } catch (e) { return ''; }
+  }
+  function applyTheme(dark) {
+    const root = document.documentElement;
+    root.classList.toggle('dark-mode', dark);
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.style.colorScheme = dark ? 'dark' : 'light';
+    const btn = document.getElementById('btn-theme');
+    if (btn) {
+      // ダーク中は「ライトにする」(太陽)、ライト中は「ダークにする」(月)
+      btn.innerHTML = dark ? SUN_SVG : MOON_SVG;
+      btn.title = dark ? 'ライトモードに切り替え' : 'ダークモードに切り替え';
+    }
+    const auto = document.getElementById('btn-theme-auto');
+    if (auto) auto.style.display = getManualTheme() ? '' : 'none';
+  }
+  window.toggleThemeManual = function () {
+    const nextDark = !document.documentElement.classList.contains('dark-mode');
+    try { localStorage.setItem('tango_theme', nextDark ? 'dark' : 'light'); } catch (e) {}
+    applyTheme(nextDark);
+  };
+  window.resetThemeAuto = function () {
+    try { localStorage.removeItem('tango_theme'); } catch (e) {}
+    updateTheme();
+  };
+  window.addEventListener('DOMContentLoaded', () => {
+    const foot = document.querySelector('#screen-home .app-foot');
+    if (foot && !document.getElementById('btn-theme-auto')) {
+      const b = document.createElement('button');
+      b.id = 'btn-theme-auto'; b.type = 'button'; b.className = 'ghost-pill';
+      b.textContent = '表示を自動(日没で切替)に戻す';
+      b.onclick = window.resetThemeAuto;
+      foot.appendChild(b);
+    }
+    updateTheme();
+  });
+
   function updateTheme() {
+    const manual = getManualTheme();
+    if (manual) { applyTheme(manual === 'dark'); return; }
     try {
       const now = tokyoNowParts();
       const currentMinutes = now.hour * 60 + now.minute;
       const sunTimes = sunTimesJST(now.year, now.month, now.day);
       const shouldBeDark = currentMinutes >= sunTimes.sunset || currentMinutes < sunTimes.sunrise;
-      document.documentElement.classList.toggle('dark-mode', shouldBeDark);
-      document.documentElement.dataset.theme = shouldBeDark ? 'dark' : 'light';
-      document.documentElement.style.colorScheme = shouldBeDark ? 'dark' : 'light';
+      applyTheme(shouldBeDark);
     } catch (error) {
       console.warn('自動ダークモードの時刻計算に失敗しました:', error);
     }
