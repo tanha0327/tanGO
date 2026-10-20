@@ -1335,6 +1335,19 @@ function startTangoAuthListener() {
             uRoundTotalCorrect = data['roundTotalCorrect' + sfx] || 0;
             uLastRoundAccuracy = data['lastRoundAccuracy' + sfx] || 0;
             uWordHistory = data['wordHistory' + sfx] || {};
+            // 10/21範囲では、既存の「休み明け」履歴から同じ単語IDの記録を引き継ぐ。
+            // 新しいoct21履歴を優先し、ほかの範囲の記録は変更しない。
+            if (activeRange === 'oct21') {
+              const legacyHistory = data.wordHistory_extra || {};
+              const mergedHistory = {};
+              Object.entries(legacyHistory).forEach(([id, history]) => {
+                const numericId = Number(id);
+                if (numericId >= 1912 && numericId <= 1968 && history && typeof history === 'object') {
+                  mergedHistory[String(id)] = { ...history };
+                }
+              });
+              uWordHistory = { ...mergedHistory, ...uWordHistory };
+            }
             const progressField = 'difficultyProgress' + sfx;
             if (data[progressField]) { uDifficultyProgress = normalizeDifficultyProgress(data[progressField]); hasCloudDifficultyProgress = true; }
           } else {
@@ -1430,7 +1443,10 @@ function renderWordAccuracyRanking() {
     return;
   }
   const info = getActiveRangeInfo();
-  const words = ALL_WORDS.slice(info.lo, info.hi + 1);
+  // IDの順番に依存せず、10/21小テストは単語ID 1912〜1968を直接抽出する
+  const words = activeRange === 'oct21'
+    ? ALL_WORDS.filter(word => Number(word.id) >= 1912 && Number(word.id) <= 1968)
+    : ALL_WORDS.slice(info.lo, info.hi + 1);
   const rows = words.map(word => {
     const h = uWordHistory[String(word.id)] || uWordHistory[word.id];
     if (!h || !(Number(h.solved) > 0)) return null;
@@ -3189,7 +3205,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.1 (10/21小テスト範囲)"; 
+const APP_VERSION = "v5.2 (間違えやすい単語ランキング修正)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
