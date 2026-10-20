@@ -59,11 +59,11 @@ let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 const state = { queue: [], current: 0, results: [] };
 
 // 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
-function rangeSuffix() { return activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : '')); }
+function rangeSuffix() { return activeRange === 'oct21' ? '_oct21' : (activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : ''))); }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
 
 function getLeaderboardRangeKey() {
-  return ['midterm', 'final', 'extra', 't2mid'].includes(activeRange) ? activeRange : 'final';
+  return ['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(activeRange) ? activeRange : 'final';
 }
 function getLeaderboardFieldNames() {
   const prefix = getLeaderboardRangeKey();
@@ -190,23 +190,24 @@ function withTimeoutFallback(promise, timeoutMs, fallbackValue, label) {
 }
 // 🌟 テスト範囲の選択肢（ユーザーごとに端末へ記憶。初期値は今回の範囲＝2学期中間）
 const RANGE_OPTIONS = [
+  { key: 'oct21',   label: '10/21 小テスト',      sub: 'DB3300 1912〜1968', blob: 'b', tone: 'yellow' },
   { key: 't2mid',   label: '2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00', blob: 'b', tone: 'yellow' },
   { key: 'extra',   label: '休み明け',            sub: 'DB3300 1633〜1968',                                                  blob: 'd', tone: 'mint' },
   { key: 'final',   label: '一学期期末',          sub: 'DB3300 1542〜1683',                                                  blob: 'a', tone: 'blue' },
   { key: 'midterm', label: '一学期中間',          sub: 'DB3300 1401〜1541',                                                  blob: 'f', tone: 'pink' },
 ];
-const DEFAULT_RANGE = 't2mid';
+const DEFAULT_RANGE = 'oct21';
 function getSavedRange() {
   try {
     const v = localStorage.getItem('tango_selected_range');
     // 旧バージョンでは一学期期末が初期値だったため、初回だけ2学期中間へ移行。
     // 移行後にユーザーが選んだ範囲は、次回以降もそのまま保持する。
-    const migrationKey = 'tango_default_range_migrated_v2';
+    const migrationKey = 'tango_default_range_migrated_v3';
     if (!localStorage.getItem(migrationKey)) {
-      if (!v || v === 'final') localStorage.setItem('tango_selected_range', DEFAULT_RANGE);
+      // 10/21小テスト範囲を新しい初期範囲に設定。初回移行時のみ既存の選択を更新する。
+      localStorage.setItem('tango_selected_range', DEFAULT_RANGE);
       localStorage.setItem(migrationKey, '1');
-      const migrated = localStorage.getItem('tango_selected_range');
-      if (RANGE_OPTIONS.some(o => o.key === migrated)) return migrated;
+      return DEFAULT_RANGE;
     }
     if (RANGE_OPTIONS.some(o => o.key === v)) return v;
   } catch (e) {}
@@ -2258,6 +2259,12 @@ function getActiveRangeInfo() {
   if (activeRange === 'midterm') return { lo: 0, hi: 140, total: 141, name: "中間範囲" };
   if (activeRange === 'final') return { lo: 141, hi: 282, total: 142, name: "期末範囲" };
   if (activeRange === 'extra') return { lo: 283, hi: 618, total: 336, name: "休み明け範囲" };
+  if (activeRange === 'oct21') {
+    const lo = ALL_WORDS.findIndex(w => Number(w.id) === 1912);
+    const last = ALL_WORDS.findIndex(w => Number(w.id) === 1968);
+    if (lo >= 0 && last >= lo) return { lo, hi: last, total: last - lo + 1, name: "10/21 小テスト（DB3300 1912〜1968）" };
+    return { lo: 0, hi: -1, total: 0, name: "10/21 小テスト（単語データ未取得）" };
+  }
   if (activeRange === 't2mid') { const n = (window.SENTENCES_T2MID || []).length; return { lo: T2MID_LO, hi: T2MID_LO + n - 1, total: n, name: "2学期中間範囲(文章題)" }; }
   return { lo: 0, hi: 0, total: 0, name: "" };
 }
@@ -3182,7 +3189,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.0 (パステルデザイン)"; 
+const APP_VERSION = "v5.1 (10/21小テスト範囲)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
