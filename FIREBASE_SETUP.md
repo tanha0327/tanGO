@@ -174,7 +174,7 @@ service cloud.firestore {
       }
     }
     match /leaderboard/{uid} {
-      allow read: if signedIn();
+      allow read: if signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
       allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
