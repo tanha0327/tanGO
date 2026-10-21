@@ -151,25 +151,63 @@ await syncAllWordsToCloud(currentUser.uid, wordStats);
 
 ## 🔐 Cloud Firestore セキュリティルール設定
 
-以下のセキュリティルールを Firebase コンソール → Firestore → ルール に設定：
+**重要：** ブラウザ内のJavaScriptで管理者ボタンを隠すだけではセキュリティになりません。アクセス制御はFirebase側のFirestoreルールで強制してください。リポジトリの `firestore.rules` を、Firebaseコンソール → Firestore Database → **ルール** に反映し、公開前にルール・認証・読み書きをテストしてください。
+
+このルールは、ユーザー本人のデータのみ編集可能にし、ランキングにメールアドレスを保存させず、単語データや難易度分類・全員共通設定の書き込みを管理者に限定する例です。管理者のメールアドレスは実際の管理者アカウントに合わせてください。
 
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ユーザーは自分のデータのみアクセス可能
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'hanta0327@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
     match /users/{uid} {
-      allow read, write: if request.auth.uid == uid;
-      
-      match /words/{document=**} {
-        allow read, write: if request.auth.uid == uid;
+      allow read, create, update, delete: if signedIn() && request.auth.uid == uid;
+      match /words/{wordId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
       }
+    }
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && !('email' in request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'updatedAt',
+          'midtermProgressPercent', 'midtermCurrentRound', 'midtermRoundProgress', 'midtermAccuracy',
+          'finalProgressPercent', 'finalCurrentRound', 'finalRoundProgress', 'finalAccuracy',
+          'extraProgressPercent', 'extraCurrentRound', 'extraRoundProgress', 'extraAccuracy',
+          't2midProgressPercent', 't2midCurrentRound', 't2midRoundProgress', 't2midAccuracy',
+          'oct21ProgressPercent', 'oct21CurrentRound', 'oct21RoundProgress', 'oct21Accuracy',
+          'progressPercent', 'currentRound', 'roundProgress', 'accuracy'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    match /vocabulary/{documentId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+    match /word_difficulty/{documentId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
 ```
 
----
+`firestore.rules` をリポジトリに置くだけではFirebaseに自動適用されません。コンソール側で反映し、ログイン・単語読み込み・自分の進捗保存・ランキング表示・管理者だけが設定変更できることを確認してください。
 
 ## 💾 データ構造
 
