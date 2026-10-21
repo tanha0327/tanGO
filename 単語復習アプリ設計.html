@@ -1759,6 +1759,7 @@ function renderQuestion() {
       `<span class="chip chip-yellow">No.${escHtml(w.id)}</span><span class="chip">英語で答えてください</span>`;
   }
   document.getElementById('quiz-answer').value = '';
+  document.getElementById('quiz-answer').placeholder = '解答を入力';
   document.getElementById('quiz-answer').disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
