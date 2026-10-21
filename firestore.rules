@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'hanta0327@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    match /users/{uid} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == uid;
+      match /words/{wordId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+    }
+
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && !('email' in request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'updatedAt',
+          'midtermProgressPercent', 'midtermCurrentRound', 'midtermRoundProgress', 'midtermAccuracy',
+          'finalProgressPercent', 'finalCurrentRound', 'finalRoundProgress', 'finalAccuracy',
+          'extraProgressPercent', 'extraCurrentRound', 'extraRoundProgress', 'extraAccuracy',
+          't2midProgressPercent', 't2midCurrentRound', 't2midRoundProgress', 't2midAccuracy',
+          'oct21ProgressPercent', 'oct21CurrentRound', 'oct21RoundProgress', 'oct21Accuracy',
+          'progressPercent', 'currentRound', 'roundProgress', 'accuracy'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /vocabulary/{documentId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /word_difficulty/{documentId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
