@@ -1725,6 +1725,7 @@ function startReviewMode() {
 let questionTimer = null;
 let questionSecondsLeft = 20;
 let questionAnswered = false;
+let mustRetypeCurrentWord = false; // 基礎・標準で間違えた場合、正答を入力するまで進めない
 const QUESTION_TIME_LIMIT = 20;
 function stopQuestionTimer() { if (questionTimer) { clearInterval(questionTimer); questionTimer = null; } }
 function startQuestionTimer() {
@@ -1740,7 +1741,7 @@ function startQuestionTimer() {
 }
 
 function renderQuestion() {
-  stopQuestionTimer(); questionAnswered = false;
+  stopQuestionTimer(); questionAnswered = false; mustRetypeCurrentWord = false;
   const w = state.queue[state.current].word;
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
@@ -1910,7 +1911,9 @@ if (!window.__tangoQuizEnterHandlerInstalled) {
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (questionAnswered) {
+    if (mustRetypeCurrentWord) {
+      submitAnswer();
+    } else if (questionAnswered) {
       nextQuestion();
     } else {
       submitAnswer();
@@ -1928,7 +1931,7 @@ if (!window.__tangoQuizEnterHandlerInstalled) {
   });
 }
 function nextQuestion() {
-  if (!questionAnswered) return;
+  if (!questionAnswered || mustRetypeCurrentWord) return;
   const nextBtn = document.getElementById('btn-next-question');
   if (nextBtn) nextBtn.style.display = 'none';
   // 次の問題へ進むときは画面上部へ戻す。
@@ -2826,6 +2829,26 @@ function startReviewMode() {
 
 // 回答内容を保存し、ランダム演習の終了レポートに利用する
 async function submitAnswer(timedOut = false) {
+  // 基礎・標準の間違い直し：正しい英単語を入力できるまで同じ問題に留まる。
+  if (mustRetypeCurrentWord) {
+    const input = document.getElementById('quiz-answer');
+    const typed = input ? input.value.trim().toLowerCase() : '';
+    const expected = String(state.queue[state.current]?.word?.en || '').trim().toLowerCase();
+    const result = document.getElementById('quiz-result');
+    if (typed === expected) {
+      mustRetypeCurrentWord = false;
+      if (input) input.disabled = true;
+      const submit = document.getElementById('btn-submit');
+      if (submit) submit.style.display = 'none';
+      if (result) result.innerHTML = '<div class="result-box result-correct"><div class="rb-head">入力できた！次へ進めます。</div></div>';
+      const hint = document.getElementById('quiz-tap-hint');
+      if (hint) hint.textContent = '画面をタップして次の問題へ進めます。';
+    } else {
+      if (input) { input.value = ''; input.placeholder = '正しい英単語を入力'; input.focus(); }
+      if (result) { result.innerHTML = '<div class="result-box result-wrong"><div class="rb-head">もう一度！正しい英単語を入力してね。</div></div>'; result.style.display = 'block'; }
+    }
+    return;
+  }
   if (questionAnswered) return;
   questionAnswered = true;
   stopQuestionTimer();
@@ -2862,22 +2885,36 @@ async function submitAnswer(timedOut = false) {
   const cls = grade === 'correct' ? 'result-correct' : grade === 'partial' ? 'result-partial' : 'result-wrong';
   const lbl = grade === 'correct' ? '正解！' : grade === 'partial' ? '部分正解' : '不正解';
   const resEl = document.getElementById('quiz-result');
+  const requireRetype = isDifficultyRandomMode && (randomDifficulty === 'easy' || randomDifficulty === 'standard') && grade !== 'correct';
+  if (requireRetype) mustRetypeCurrentWord = true;
   if (resEl) {
-    resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div>' +
-      '<div class="rb-ans"><small>模範解答</small><strong>' + escapeLeaderboardText(correct) + '</strong></div>' +
-      (word.sentence ? '<div class="rb-sent">' + escapeLeaderboardText(word.sentence.replace(/\(\s*____\s*\)/g, '\u0001')).split('\u0001').join('<span class="filled">' + escapeLeaderboardText(correct) + '</span>') + '</div>' : '') +
-      (word.sentenceJp ? '<div class="rb-mean">意味: ' + escapeLeaderboardText(word.sentenceJp) + '</div>' : '') +
-      '</div>';
+    if (requireRetype) {
+      resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div><div class="rb-mean">正しい英単語を入力すると次へ進めます。</div></div>';
+    } else {
+      resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div>' +
+        '<div class="rb-ans"><small>模範解答</small><strong>' + escapeLeaderboardText(correct) + '</strong></div>' +
+        (word.sentence ? '<div class="rb-sent">' + escapeLeaderboardText(word.sentence.replace(/\(\s*____\s*\)/g, '\u0001')).split('\u0001').join('<span class="filled">' + escapeLeaderboardText(correct) + '</span>') + '</div>' : '') +
+        (word.sentenceJp ? '<div class="rb-mean">意味: ' + escapeLeaderboardText(word.sentenceJp) + '</div>' : '') +
+        '</div>';
+    }
     resEl.style.display = 'block';
   }
 
-  if (answerInput) answerInput.disabled = true;
   const submitBtn = document.getElementById('btn-submit');
-  if (submitBtn) submitBtn.style.display = 'none';
   const timerEl = document.getElementById('quiz-timer');
-  if (timerEl) timerEl.textContent = timedOut ? '時間切れ' : '回答済み';
   const tapHint = document.getElementById('quiz-tap-hint');
-  if (tapHint) tapHint.textContent = '画面のどこをタップしても次の問題へ進みます。';
+  if (requireRetype) {
+    if (answerInput) { answerInput.disabled = false; answerInput.value = ''; answerInput.placeholder = '正しい英単語を入力'; }
+    if (submitBtn) submitBtn.style.display = 'block';
+    if (timerEl) timerEl.textContent = '間違い直し';
+    if (tapHint) tapHint.textContent = '正しい英単語を入力して「回答する」かEnterを押してください。';
+    requestAnimationFrame(() => answerInput && answerInput.focus());
+  } else {
+    if (answerInput) answerInput.disabled = true;
+    if (submitBtn) submitBtn.style.display = 'none';
+    if (timerEl) timerEl.textContent = timedOut ? '時間切れ' : '回答済み';
+    if (tapHint) tapHint.textContent = '画面のどこをタップしても次の問題へ進みます。';
+  }
 
   if (!isGuest && auth.currentUser) {
     const sfx = rangeSuffix();
