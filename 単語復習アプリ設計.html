@@ -84,7 +84,8 @@ function buildLeaderboardData(user, displayName) {
   const data = {
     uid: user.uid,
     displayName: name,
-    email: user.email || '',
+    // ランキングは公開される可能性があるため、メールアドレスを保存しない。既存値も削除する。
+    email: firebase.firestore.FieldValue.delete(),
     [fields.progress]: progressPercent,
     [fields.round]: uCurrentRound,
     [fields.roundProgress]: roundProgress,
@@ -1861,7 +1862,8 @@ async function submitAnswer(timedOut = false) {
     db.collection('leaderboard').doc(auth.currentUser.uid).set({
       uid: auth.currentUser.uid,
       displayName: nameToSave,
-      email: auth.currentUser.email,
+      // 既存の公開ランキングに残ったメールアドレスも、この同期時に削除する。
+      email: firebase.firestore.FieldValue.delete(),
       progressPercent: accumulatedProgress,  // ソート用
       currentRound: uCurrentRound,
       roundProgress: Math.floor((uRoundAnswers.length / rangeTotal) * 100),
@@ -2130,16 +2132,24 @@ async function saveNickname() {
       document.getElementById('user-info').textContent = `${newName}`;
       document.getElementById('nickname-modal').classList.remove('open');
       // リーダーボード側の名前を書き換えるためのダミー更新
-      db.collection('leaderboard').doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true });
+      db.collection('leaderboard').doc(auth.currentUser.uid).set({ displayName: newName, email: firebase.firestore.FieldValue.delete() }, { merge: true });
       refreshUI();
     } catch(e) { alert("保存に失敗しました"); }
   }
 }
 
 // 共通管理者用設定
-function openTestDateModal() { document.getElementById('testdate-modal').classList.add('open'); }
+function openTestDateModal() {
+  if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
+  document.getElementById('testdate-modal').classList.add('open');
+}
 async function setAndSaveSharedTest(testName, isoDateString, rangeType) {
+  // UIを隠すだけではセキュリティにならないが、通常ユーザーからの呼び出しも拒否する。
+  if (!isWordAdmin()) { alert('この操作は管理者のみ実行できます。'); return; }
   const targetDate = new Date(isoDateString);
+  if (!Number.isFinite(targetDate.getTime()) || !['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(rangeType)) {
+    alert('テスト日時または範囲が正しくありません。'); return;
+  }
   if (!isGuest && auth.currentUser) {
     try {
       await db.collection('vocabulary').doc('active_test').set({ testDate: targetDate.toISOString(), activeRange: rangeType }, { merge: true });
@@ -3249,7 +3259,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.2 (間違えやすい単語ランキング修正)"; 
+const APP_VERSION = "v5.3 (セキュリティ強化)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
