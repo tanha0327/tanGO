@@ -918,7 +918,8 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       <p class="modal-sub">テスト範囲を選んで、その範囲の単語だけを「基礎・標準・挑戦」に分類します。</p>
       <div class="note-box">キーボード分類：← 基礎 ／ ↓ 標準 ／ → 挑戦。分類後は次の単語へ進みます。</div>
       <div class="word-admin-range-buttons" id="word-admin-range-buttons">
-        <button type="button" class="opt-btn selected" data-range="t2mid" onclick="setWordAdminRange('t2mid')">2学期中間</button>
+        <button type="button" class="opt-btn" data-range="oct21" onclick="setWordAdminRange('oct21')">10/21 小テスト</button>
+        <button type="button" class="opt-btn" data-range="t2mid" onclick="setWordAdminRange('t2mid')">2学期中間（文章題）</button>
         <button type="button" class="opt-btn" data-range="extra" onclick="setWordAdminRange('extra')">休み明け</button>
         <button type="button" class="opt-btn" data-range="final" onclick="setWordAdminRange('final')">一学期期末</button>
         <button type="button" class="opt-btn" data-range="midterm" onclick="setWordAdminRange('midterm')">一学期中間</button>
@@ -2452,6 +2453,11 @@ function getWordAdminRangeInfo(rangeKey) {
   if (rangeKey === 'midterm') return { lo: 0, hi: 140, label: '一学期中間' };
   if (rangeKey === 'final') return { lo: 141, hi: 282, label: '一学期期末' };
   if (rangeKey === 'extra') return { lo: 283, hi: 618, label: '休み明け' };
+  if (rangeKey === 'oct21') {
+    const lo = ALL_WORDS.findIndex(w => Number(w.id) === 1912);
+    const hi = ALL_WORDS.findIndex(w => Number(w.id) === 1968);
+    return { lo, hi, label: '10/21 小テスト（DB3300 1912〜1968）' };
+  }
   if (rangeKey === 't2mid') {
     const count = (window.SENTENCES_T2MID || []).length;
     return { lo: T2MID_LO, hi: T2MID_LO + count - 1, label: '2学期中間（文章題）' };
@@ -2600,7 +2606,7 @@ function updateWordAdminButton(user = auth.currentUser) {
 function openWordAdmin() {
   if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
   wordAdminFiltered = 'unclassified';
-  wordAdminRange = ['midterm', 'final', 'extra', 't2mid'].includes(activeRange) ? activeRange : 't2mid';
+  wordAdminRange = ['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(activeRange) ? activeRange : 't2mid';
   const input = document.getElementById('word-admin-search');
   if (input) input.value = '';
   setWordAdminRange(wordAdminRange);
@@ -2609,7 +2615,7 @@ function openWordAdmin() {
 }
 
 function setWordAdminRange(rangeKey) {
-  if (!['midterm', 'final', 'extra', 't2mid'].includes(rangeKey)) return;
+  if (!['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(rangeKey)) return;
   wordAdminKeyboardIndex = 0;
   wordAdminRange = rangeKey;
   document.querySelectorAll('#word-admin-range-buttons [data-range]').forEach(btn => {
