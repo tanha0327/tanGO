@@ -18,6 +18,10 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 console.log("✅ Firebase 準備完了 (記号クリーニング＆完全復習システム)");
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>\"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' })[ch]);
+}
+
 // グローバル変数
 let isGuest = false;
 let testDate = null;
@@ -312,7 +316,7 @@ async function submitAnswer() {
     const nameToSave = currentNickname || auth.currentUser.displayName || '名無し';
 
     db.collection('leaderboard').doc(auth.currentUser.uid).set({
-      uid: auth.currentUser.uid, displayName: nameToSave, email: auth.currentUser.email,
+      uid: auth.currentUser.uid, displayName: nameToSave, email: firebase.firestore.FieldValue.delete(),
       progressPercent: accumulatedProgress, currentRound: uCurrentRound,
       roundProgress: Math.floor((uRoundAnswers.length / rangeTotal) * 100),
       accuracy: totalAccuracy, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -360,7 +364,7 @@ function updateLeaderboardDisplay() {
     homeLeaderboard.innerHTML = snapshot.docs.map(doc => {
       const e = doc.data(); const rankEmoji = i===0?'👑':i===1?'🥈':'🥉'; i++;
       return `<div style="padding:6px; background:${i===1?'#fff9c4':'#f5f5f5'}; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between;">
-        <span>${rankEmoji} ${i}. <b>${e.displayName}</b></span>
+        <span>${rankEmoji} ${i}. <b>${escapeHtml(e.displayName || '名無し')}</b></span>
         <span><b style="color:#1976d2;">${e.currentRound}周目 ${e.roundProgress || 0}%</b> <span style="font-size:11px;color:#666;">(正解率:${e.accuracy || 0}%)</span></span>
       </div>`;
     }).join('');
@@ -377,7 +381,7 @@ function openLeaderboardModal() {
     boardEl.innerHTML = snapshot.docs.map(doc => {
       const e = doc.data(); i++;
       return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-        <div><div style="font-weight:bold;">${i}. ${e.displayName}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div>
+        <div><div style="font-weight:bold;">${i}. ${escapeHtml(e.displayName || '名無し')}</div><div style="font-size:11px; color:#888;">正解率: ${e.accuracy || 0}%</div></div>
         <div style="text-align:right;"><div style="color:#1976d2; font-weight:bold; font-size:16px;">${e.currentRound}周目 ${e.roundProgress || 0}%</div></div>
       </div>`;
     }).join('');
@@ -393,7 +397,7 @@ async function saveNickname() {
       await db.collection('users').doc(auth.currentUser.uid).set({ nickname: newName }, { merge: true });
       currentNickname = newName; document.getElementById('user-info').textContent = `👤 ${newName}`;
       document.getElementById('nickname-modal').classList.remove('open');
-      db.collection('leaderboard').doc(auth.currentUser.uid).set({ displayName: newName }, { merge: true });
+      db.collection('leaderboard').doc(auth.currentUser.uid).set({ displayName: newName, email: firebase.firestore.FieldValue.delete() }, { merge: true });
       refreshUI();
     } catch(e) {}
   }
