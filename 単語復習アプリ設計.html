@@ -2896,7 +2896,11 @@ async function submitAnswer(timedOut = false) {
       if (hint) hint.textContent = '画面をタップして次の問題へ進めます。';
     } else {
       if (input) { input.value = ''; input.placeholder = '正しい英単語を入力'; input.focus(); }
-      if (result) { result.innerHTML = '<div class="result-box result-wrong"><div class="rb-head">もう一度！正しい英単語を入力してね。</div></div>'; result.style.display = 'block'; }
+      const answer = state.queue[state.current]?.word?.en || expected;
+      if (result) {
+        result.innerHTML = '<div class="result-box result-wrong"><div class="rb-head">もう一度！模範解答を見て書き写してね。</div><div class="rb-ans"><small>模範解答</small><strong>' + escapeLeaderboardText(answer) + '</strong></div></div>';
+        result.style.display = 'block';
+      }
     }
     return;
   }
@@ -2940,7 +2944,9 @@ async function submitAnswer(timedOut = false) {
   if (requireRetype) mustRetypeCurrentWord = true;
   if (resEl) {
     if (requireRetype) {
-      resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div><div class="rb-mean">正しい英単語を入力すると次へ進めます。</div></div>';
+      resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div>' +
+        '<div class="rb-ans"><small>模範解答</small><strong>' + escapeLeaderboardText(correct) + '</strong></div>' +
+        '<div class="rb-mean">模範解答を見て書き写すと、次へ進めます。</div></div>';
     } else {
       resEl.innerHTML = '<div class="result-box ' + cls + '"><div class="rb-head">' + lbl + '</div>' +
         '<div class="rb-ans"><small>模範解答</small><strong>' + escapeLeaderboardText(correct) + '</strong></div>' +
