@@ -648,6 +648,13 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 .wc-group[open] summary::after { transform: rotate(-90deg); }
 .wc-count { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .wc-body { padding: 0 14px 14px; }
+.wc-group-preview { overflow: hidden; margin-bottom: 12px; border: 1.5px solid var(--line); border-radius: 20px; background: var(--card); }
+.wc-group-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 14px 16px 0; font-size: 14px; font-weight: 900; }
+.wc-group-preview .wc-body { padding-top: 8px; }
+.wc-more { margin-top: 10px; border-top: 1.5px solid var(--line); }
+.wc-more summary { padding: 12px 2px 2px; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.wc-more[open] summary { padding-bottom: 8px; }
+
 .wc-item { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1.5px solid var(--line); }
 .wc-item:first-child { border-top: 0; }
 .wc-item-main { flex: 1; min-width: 0; }
@@ -1652,8 +1659,7 @@ function openWrongCountPracticeModal() {
   if (words.length === 0) {
     list.innerHTML = '<div class="wc-empty">まだ間違えた単語がありません。</div>';
   } else {
-    // 10語以下なら回数で細分化せず、全部をひとまとめにする。
-    // 11語以上の場合は、間違えた回数を降順に並べ、回数差が3以上の場所でグループを分ける。
+    // 10語以下なら全部まとめ、11語以上なら間違い回数の差が3以上でグループ化。
     const buckets = [];
     if (words.length <= 10) {
       buckets.push({ rows: words, counts: [...new Set(words.map(row => row.wrong))].sort((a,b) => b-a), all: true });
@@ -1669,27 +1675,32 @@ function openWrongCountPracticeModal() {
         current.lastCount = row.wrong;
       });
     }
-    list.innerHTML = buckets.map((bucket, index) => {
+
+    list.innerHTML = buckets.map(bucket => {
       const rows = bucket.rows;
       const counts = bucket.counts;
       const label = bucket.all
         ? '全部まとめて特訓'
         : (counts.length === 1 ? counts[0] + '回間違えた単語' : counts[0] + '〜' + counts[counts.length - 1] + '回の単語');
-      const items = rows.map(row => {
+      const renderItem = row => {
         const en = escHtml(String(row.word.en || ""));
         const jp = escHtml(String(row.word.jp || row.word.meaning || ""));
         return '<div class="wc-item"><div class="wc-item-main"><div class="wc-en">' + en + '</div>'
           + (jp ? '<div class="wc-jp">' + jp + '</div>' : '')
           + '</div><span class="wc-miss">間違い ' + row.wrong + '回</span></div>';
-      }).join("");
+      };
+      const topThree = rows.slice(0, 3).map(renderItem).join("");
+      const remaining = rows.slice(3);
+      const rest = remaining.length
+        ? '<details class="wc-more"><summary>残り' + remaining.length + '語を表示</summary>' + remaining.map(renderItem).join("") + '</details>'
+        : '';
       const countArg = bucket.all ? 'null' : JSON.stringify(counts);
-      const buttonText = bucket.all ? 'この' + rows.length + '語をまとめて特訓'
-        : (counts.length === 1 ? 'この' + counts[0] + '回の単語を特訓' : 'このグループの' + rows.length + '語を特訓');
-      return '<details class="wc-group"' + (buckets.length === 1 ? ' open' : '') + '>'
-        + '<summary><span>' + label + '<span class="wc-count">（' + rows.length + '語）</span></span></summary>'
-        + '<div class="wc-body">' + items
+      const buttonText = 'このグループの' + rows.length + '語を特訓';
+      return '<section class="wc-group wc-group-preview">'
+        + '<div class="wc-group-heading"><span>' + label + '</span><span class="wc-count">（' + rows.length + '語）</span></div>'
+        + '<div class="wc-body">' + topThree
         + '<button class="big-btn btn-secondary" onclick="startWrongCountPractice(' + countArg + ')">' + buttonText + '</button>'
-        + '</div></details>';
+        + rest + '</div></section>';
     }).join("");
   }
   document.getElementById("wrong-count-practice-modal").classList.add("open");
