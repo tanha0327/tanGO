@@ -545,6 +545,7 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 .countdown-days { font-size: 80px; font-weight: 900; line-height: 1.05; letter-spacing: -.03em; }
 .hero-unit { font-size: 22px; font-weight: 900; }
 .countdown-hms { font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.countdown-hms.is-hours-only { font-size: 80px; line-height: 1.05; letter-spacing: -.03em; }
 #norma-area { margin: 14px 4px 0; }
 .norma-badge { display: inline-flex; flex-direction: column; gap: 1px; padding: 9px 15px; border-radius: 18px; background: #FCFAF6; color: #111; font-size: 14px; line-height: 1.4; }
 .norma-badge b { font-weight: 900; }
@@ -2663,6 +2664,12 @@ function getWordAdminRangeInfo(rangeKey) {
     const count = (window.SENTENCES_T2MID || []).length;
     return { lo: T2MID_LO, hi: T2MID_LO + count - 1, label: '2学期中間（文章題）' };
   }
+  const scheduled = SCHEDULE_RANGE_OPTIONS.find(option => option.key === rangeKey);
+  if (scheduled) {
+    const lo = ALL_WORDS.findIndex(word => Number(word.id) === scheduled.startId);
+    const hi = ALL_WORDS.findIndex(word => Number(word.id) === scheduled.endId);
+    return { lo, hi, label: `英語コミュニケーションⅢ ${scheduled.label}（DB3300 ${scheduled.startId}〜${scheduled.endId}）` };
+  }
   return { lo: 0, hi: -1, label: '' };
 }
 
@@ -2804,10 +2811,26 @@ function updateWordAdminButton(user = auth.currentUser) {
   home.appendChild(btn);
 }
 
+function renderWordAdminRangeButtons() {
+  const container = document.getElementById('word-admin-range-buttons');
+  if (!container) return;
+  container.innerHTML = '';
+  RANGE_OPTIONS.forEach(option => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'opt-btn';
+    button.dataset.range = option.key;
+    button.textContent = option.label;
+    button.addEventListener('click', () => setWordAdminRange(option.key));
+    container.appendChild(button);
+  });
+}
+
 function openWordAdmin() {
   if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
   wordAdminFiltered = 'unclassified';
-  wordAdminRange = ['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(activeRange) ? activeRange : 't2mid';
+  renderWordAdminRangeButtons();
+  wordAdminRange = RANGE_OPTIONS.some(option => option.key === activeRange) ? activeRange : 't2mid';
   const input = document.getElementById('word-admin-search');
   if (input) input.value = '';
   setWordAdminRange(wordAdminRange);
@@ -2816,7 +2839,7 @@ function openWordAdmin() {
 }
 
 function setWordAdminRange(rangeKey) {
-  if (!['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(rangeKey)) return;
+  if (!RANGE_OPTIONS.some(option => option.key === rangeKey)) return;
   wordAdminKeyboardIndex = 0;
   wordAdminRange = rangeKey;
   document.querySelectorAll('#word-admin-range-buttons [data-range]').forEach(btn => {
@@ -3247,6 +3270,7 @@ function tickCountdown() {
   if (diff <= 0) {
     labelEl.textContent = `${info.name} 当日！`;
     if (daysWrap) daysWrap.style.display = 'none';
+    hmsEl.classList.remove('is-hours-only');
     hmsEl.textContent = '00:00:00';
     normaEl.innerHTML = '<div class="norma-badge"><b>本番開始！全力で行こう！</b></div>';
     return;
@@ -3260,6 +3284,7 @@ function tickCountdown() {
 
   labelEl.textContent = `${info.name}まで（${formatJstDeadline(testDate)}）`;
   if (daysWrap) daysWrap.style.display = days > 0 ? 'flex' : 'none';
+  hmsEl.classList.toggle('is-hours-only', days === 0);
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 
@@ -3452,7 +3477,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.5 (英語コミュニケーションⅢ・2026単語テスト予定)"; 
+const APP_VERSION = "v5.6 (小テスト難易度管理・時間表示改善)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
