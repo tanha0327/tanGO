@@ -805,7 +805,12 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 .wc-body .big-btn { margin: 10px 0 0; }
 
 /* word admin */
-.word-admin-range-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0 12px; }
+.word-admin-range-selector { margin: 10px 0 12px; border: 1.5px solid var(--line-2); border-radius: 18px; background: var(--field); overflow: hidden; }
+.word-admin-range-selector summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; cursor: pointer; list-style: none; font-size: 13px; font-weight: 900; }
+.word-admin-range-selector summary::-webkit-details-marker { display: none; }
+.word-admin-range-selector summary::after { content: '⌄'; flex: none; font-size: 20px; line-height: 1; transition: transform .15s ease; }
+.word-admin-range-selector[open] summary::after { transform: rotate(180deg); }
+.word-admin-range-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0 10px 10px; max-height: 42vh; overflow-y: auto; }
 .word-admin-range-buttons .opt-btn { padding: 11px 8px; font-size: 13px; }
 .word-admin-range-buttons .opt-btn.is-past { opacity: .42; filter: grayscale(.75); }
 .word-admin-range-buttons .opt-btn.is-past.selected { opacity: .62; }
@@ -1075,13 +1080,10 @@ window.__tangoInitialWatchdog = setTimeout(() => {
       <div class="modal-title">単語難易度の管理</div>
       <p class="modal-sub">テスト範囲を選んで、その範囲の単語だけを「基礎・標準・挑戦」に分類します。</p>
       <div class="note-box">キーボード分類：← 基礎 ／ ↓ 標準 ／ → 挑戦。分類後は次の単語へ進みます。</div>
-      <div class="word-admin-range-buttons" id="word-admin-range-buttons">
-        <button type="button" class="opt-btn" data-range="oct21" onclick="setWordAdminRange('oct21')">10/21 小テスト</button>
-        <button type="button" class="opt-btn" data-range="t2mid" onclick="setWordAdminRange('t2mid')">2学期中間（文章題）</button>
-        <button type="button" class="opt-btn" data-range="extra" onclick="setWordAdminRange('extra')">休み明け</button>
-        <button type="button" class="opt-btn" data-range="final" onclick="setWordAdminRange('final')">一学期期末</button>
-        <button type="button" class="opt-btn" data-range="midterm" onclick="setWordAdminRange('midterm')">一学期中間</button>
-      </div>
+      <details class="word-admin-range-selector" id="word-admin-range-selector">
+        <summary id="word-admin-range-summary">範囲を選ぶ</summary>
+        <div class="word-admin-range-buttons" id="word-admin-range-buttons"></div>
+      </details>
       <input id="word-admin-search" class="search-input" type="search" placeholder="英単語・日本語で検索" oninput="renderWordAdminList()">
       <div class="option-grid">
         <button class="opt-btn selected" id="word-admin-filter-unclassified" onclick="setWordAdminFilter('unclassified')">未分類</button>
@@ -2820,6 +2822,9 @@ function updateWordAdminButton(user = auth.currentUser) {
 function renderWordAdminRangeButtons() {
   const container = document.getElementById('word-admin-range-buttons');
   if (!container) return;
+  const selected = RANGE_OPTIONS.find(option => option.key === wordAdminRange);
+  const summary = document.getElementById('word-admin-range-summary');
+  if (summary) summary.textContent = selected ? '範囲：' + selected.label : '範囲を選ぶ';
   container.innerHTML = '';
   RANGE_OPTIONS.forEach(option => {
     const button = document.createElement('button');
@@ -2837,8 +2842,8 @@ function renderWordAdminRangeButtons() {
 function openWordAdmin() {
   if (!isWordAdmin()) { alert('管理者アカウントでログインしてください。'); return; }
   wordAdminFiltered = 'unclassified';
-  renderWordAdminRangeButtons();
   wordAdminRange = RANGE_OPTIONS.some(option => option.key === activeRange) ? activeRange : 't2mid';
+  renderWordAdminRangeButtons();
   const input = document.getElementById('word-admin-search');
   if (input) input.value = '';
   setWordAdminRange(wordAdminRange);
@@ -2850,9 +2855,14 @@ function setWordAdminRange(rangeKey) {
   if (!RANGE_OPTIONS.some(option => option.key === rangeKey)) return;
   wordAdminKeyboardIndex = 0;
   wordAdminRange = rangeKey;
+  const selected = RANGE_OPTIONS.find(option => option.key === rangeKey);
+  const summary = document.getElementById('word-admin-range-summary');
+  if (summary) summary.textContent = selected ? '範囲：' + selected.label : '範囲を選ぶ';
   document.querySelectorAll('#word-admin-range-buttons [data-range]').forEach(btn => {
     btn.classList.toggle('selected', btn.dataset.range === rangeKey);
   });
+  const selector = document.getElementById('word-admin-range-selector');
+  if (selector) selector.open = false;
   renderWordAdminList();
 }
 
@@ -3485,7 +3495,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.7 (終了済み範囲の難易度管理表示)"; 
+const APP_VERSION = "v5.8 (難易度管理の範囲選択を折りたたみ)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
