@@ -631,6 +631,13 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 .testdate-list { display: flex; flex-direction: column; gap: 10px; }
 .testdate-list .big-btn { margin: 0; }
 
+/* Word accuracy ranking: top 3 collapsed, tap to reveal top 10 */
+.wa-ranking-toggle { width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px; padding:12px 14px; border:1.5px solid var(--line-2); border-radius:16px; background:var(--field); color:var(--ink); font:inherit; font-size:13px; font-weight:900; cursor:pointer; }
+.wa-ranking-toggle:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+.wa-ranking-toggle .wa-toggle-chevron { display:inline-block; transition:transform .18s ease; }
+.wa-ranking-toggle[aria-expanded="true"] .wa-toggle-chevron { transform:rotate(180deg); }
+.wa-row[hidden] { display:none !important; }
+
 /* wrong-count practice */
 .wc-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .wc-empty { padding: 22px 0; text-align: center; font-size: 14px; color: var(--muted); }
@@ -1461,17 +1468,39 @@ function renderWordAccuracyRanking() {
     el.innerHTML = '<span class="lb-empty">まだ解答履歴がありません。問題を解くとランキングが表示されます。</span>';
     return;
   }
-  el.innerHTML = rows.map((row, index) => {
+  const wasExpanded = el.querySelector('.wa-ranking-toggle')?.getAttribute('aria-expanded') === 'true';
+  const rowHtml = rows.map((row, index) => {
     const label = row.word.sentence || row.word.en || ('単語ID ' + row.word.id);
     const safeLabel = escapeLeaderboardText(label);
     const safeAnswer = escapeLeaderboardText(row.word.en || '');
     const cls = index === 0 ? 'top1' : (index < 3 ? 'top3' : '');
-    return '<div class="wa-row ' + cls + '"><div class="wa-no">' + (index + 1) + '位</div>' +
+    const hidden = index >= 3 && !wasExpanded ? ' hidden' : '';
+    return '<div class="wa-row ' + cls + '" data-wa-rank="' + (index + 1) + '"' + hidden + '><div class="wa-no">' + (index + 1) + '位</div>' +
       '<div class="wa-body"><div class="wa-label">' + safeLabel + '</div>' +
       (row.word.sentence ? '<div class="wa-sub">答え：' + safeAnswer + '</div>' : '') +
       '<div class="wa-sub">' + row.correct + '/' + row.solved + '回正解 ・ 不正解 ' + row.wrong + '回</div></div>' +
       '<div class="wa-score' + (row.accuracy < 50 ? ' low' : '') + '">' + row.accuracy + '%</div></div>';
-  }).join('') + '<div class="lb-note">※ 以前の履歴は正解数を推定している場合があります。</div>';
+  }).join('');
+  const toggleHtml = rows.length > 3
+    ? '<button type="button" class="wa-ranking-toggle" aria-expanded="' + wasExpanded + '" onclick="toggleWordAccuracyRanking(this)" aria-controls="word-accuracy-ranking-rows">' +
+      (wasExpanded ? '上位3件だけ表示' : 'タップして10位まで表示') +
+      '<span class="wa-toggle-chevron" aria-hidden="true">⌄</span></button>'
+    : '';
+  el.innerHTML = '<div id="word-accuracy-ranking-rows">' + rowHtml + '</div>' + toggleHtml +
+    '<div class="lb-note">※ 以前の履歴は正解数を推定している場合があります。</div>';
+}
+
+function toggleWordAccuracyRanking(button) {
+  const expanded = button.getAttribute('aria-expanded') === 'true';
+  const nextExpanded = !expanded;
+  button.setAttribute('aria-expanded', String(nextExpanded));
+  button.innerHTML = (nextExpanded ? '上位3件だけ表示' : 'タップして10位まで表示') +
+    '<span class="wa-toggle-chevron" aria-hidden="true">⌄</span>';
+  const container = document.getElementById('word-accuracy-ranking-rows');
+  if (!container) return;
+  container.querySelectorAll('[data-wa-rank]').forEach(row => {
+    row.hidden = !nextExpanded && Number(row.getAttribute('data-wa-rank')) > 3;
+  });
 }
 
 function refreshUI() {
