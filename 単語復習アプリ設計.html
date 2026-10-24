@@ -279,11 +279,11 @@ const SCHEDULE_RANGE_OPTIONS = ENGLISH_COMMUNICATION_III_TESTS.map((entry, index
 });
 
 const LEGACY_RANGE_OPTIONS = [
-  { key: 'oct21',   label: '10/21 小テスト',      sub: 'DB3300 1912〜1968', blob: 'b', tone: 'yellow' },
-  { key: 't2mid',   label: '2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00', blob: 'b', tone: 'yellow' },
-  { key: 'extra',   label: '休み明け',            sub: 'DB3300 1633〜1968', blob: 'd', tone: 'mint' },
-  { key: 'final',   label: '一学期期末',          sub: 'DB3300 1542〜1683', blob: 'a', tone: 'blue' },
-  { key: 'midterm', label: '一学期中間',          sub: 'DB3300 1401〜1541', blob: 'f', tone: 'pink' }
+  { key: 'oct21',   label: '10/21 小テスト',      sub: 'DB3300 1912〜1968', blob: 'b', tone: 'yellow', completed: true },
+  { key: 't2mid',   label: '2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00', blob: 'b', tone: 'yellow', completed: true },
+  { key: 'extra',   label: '休み明け',            sub: 'DB3300 1633〜1968', blob: 'd', tone: 'mint', completed: true },
+  { key: 'final',   label: '一学期期末',          sub: 'DB3300 1542〜1683', blob: 'a', tone: 'blue', completed: true },
+  { key: 'midterm', label: '一学期中間',          sub: 'DB3300 1401〜1541', blob: 'f', tone: 'pink', completed: true }
 ];
 
 // 既存範囲はそのまま残し、2026年度の定期テスト日程を追加する。
@@ -297,6 +297,11 @@ function getRangeDeadline(option) {
     if (Number.isFinite(deadline.getTime())) return deadline;
   }
   return null;
+}
+
+function isPastTestRange(option, now = new Date()) {
+  const deadline = getRangeDeadline(option);
+  return Boolean(option && (option.completed || (deadline && deadline.getTime() <= now.getTime())));
 }
 
 function getNearestFutureRangeKey(now = new Date()) {
@@ -337,8 +342,7 @@ function openRangeModal() {
     : `期限が最も近い範囲（${RANGE_OPTIONS.find(option => option.key === suggested).label}）を自動選択中です。`;
   box.innerHTML = `<p class="range-auto-note">${helper}</p>` + RANGE_OPTIONS.map(option => {
     const selected = option.key === activeRange;
-    const deadline = getRangeDeadline(option);
-    const past = Boolean(deadline && deadline.getTime() <= now.getTime());
+    const past = isPastTestRange(option, now);
     return `<button class="range-opt tone-${option.tone}${selected ? ' selected' : ''}${past ? ' is-past' : ''}" aria-pressed="${selected}" onclick="selectRange('${option.key}')">` +
       `<svg class="blob ro-blob" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-${option.blob}"/></svg>` +
       `<span class="ro-text"><b>${option.label}</b><small>${option.sub}</small></span>` +
@@ -803,6 +807,8 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 /* word admin */
 .word-admin-range-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0 12px; }
 .word-admin-range-buttons .opt-btn { padding: 11px 8px; font-size: 13px; }
+.word-admin-range-buttons .opt-btn.is-past { opacity: .42; filter: grayscale(.75); }
+.word-admin-range-buttons .opt-btn.is-past.selected { opacity: .62; }
 .search-input { width: 100%; padding: 12px 16px; border: 1.5px solid var(--line-2); border-radius: var(--r-field); background: var(--field); font-size: 15px; outline: none; }
 .search-input:focus { border-color: var(--ink); box-shadow: 0 0 0 4px rgba(255, 229, 154, .9); }
 .word-admin-summary { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--muted); }
@@ -2818,9 +2824,11 @@ function renderWordAdminRangeButtons() {
   RANGE_OPTIONS.forEach(option => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'opt-btn';
+    const past = isPastTestRange(option);
+    button.className = 'opt-btn' + (past ? ' is-past' : '');
     button.dataset.range = option.key;
     button.textContent = option.label;
+    if (past) button.setAttribute('aria-label', option.label + '（終了済み）');
     button.addEventListener('click', () => setWordAdminRange(option.key));
     container.appendChild(button);
   });
@@ -3477,7 +3485,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.6 (小テスト難易度管理・時間表示改善)"; 
+const APP_VERSION = "v5.7 (終了済み範囲の難易度管理表示)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
