@@ -59,11 +59,11 @@ let uWordHistory = {};      // 各単語の{solved, wrong}回数記録マッブ
 const state = { queue: [], current: 0, results: [] };
 
 // 🌟 範囲ごとにセーブデータ名を分ける接尾辞（''=中間/期末、'_extra'=休み明け、'_t2mid'=2学期中間(文章題)）
-function rangeSuffix() { return activeRange === 'oct21' ? '_oct21' : (activeRange === 'extra' ? '_extra' : (activeRange === 't2mid' ? '_t2mid' : (activeRange === 'midterm' ? '_midterm' : ''))); }
+function rangeSuffix() { return activeRange ? '_' + activeRange.replace(/[^a-zA-Z0-9_]/g, '_') : ''; }
 let T2MID_LO = 0; // ALL_WORDS の中で2学期中間(文章題)が始まる位置
 
 function getLeaderboardRangeKey() {
-  return ['midterm', 'final', 'extra', 't2mid', 'oct21'].includes(activeRange) ? activeRange : 'final';
+  return RANGE_OPTIONS.some(option => option.key === activeRange) ? activeRange : DEFAULT_RANGE;
 }
 function getLeaderboardFieldNames() {
   const prefix = getLeaderboardRangeKey();
@@ -189,55 +189,158 @@ function withTimeoutFallback(promise, timeoutMs, fallbackValue, label) {
     });
   });
 }
-// 🌟 テスト範囲の選択肢（ユーザーごとに端末へ記憶。初期値は今回の範囲＝2学期中間）
-const RANGE_OPTIONS = [
-  { key: 'oct21',   label: '10/21 小テスト',      sub: 'DB3300 1912〜1968', blob: 'b', tone: 'yellow' },
-  { key: 't2mid',   label: '2学期中間（文章題）', sub: 'DB3300 1684〜1826 / 10/15 9:10', testDate: '2026-10-15T09:10:00', blob: 'b', tone: 'yellow' },
-  { key: 'extra',   label: '休み明け',            sub: 'DB3300 1633〜1968',                                                  blob: 'd', tone: 'mint' },
-  { key: 'final',   label: '一学期期末',          sub: 'DB3300 1542〜1683',                                                  blob: 'a', tone: 'blue' },
-  { key: 'midterm', label: '一学期中間',          sub: 'DB3300 1401〜1541',                                                  blob: 'f', tone: 'pink' },
+// 英語コミュニケーションⅢ 単語テスト（2026年度）
+// 記載日はテスト週の開始日。期限は、その日より後の最初の授業開始時刻（日本時間）です。
+const RANGE_SELECTION_KEY = 'tango_selected_range';
+const RANGE_MANUAL_SELECTION_KEY = 'tango_selected_range_manual_v1';
+const JAPAN_TIME_ZONE = 'Asia/Tokyo';
+const CLASS_START_HOUR_BY_WEEKDAY = { 2: 12, 3: 12, 4: 11, 5: 11 }; // Tue/Wed 12:00, Thu/Fri 11:00
+const ENGLISH_COMMUNICATION_III_TESTS = [
+  { weekStart: '2026-04-13', startId: 1401, endId: 1456 },
+  { weekStart: '2026-04-20', startId: 1457, endId: 1512 },
+  { weekStart: '2026-04-27', startId: 1513, endId: 1569 },
+  { weekStart: '2026-05-11', startId: 1570, endId: 1626 },
+  { weekStart: '2026-05-25', startId: 1627, endId: 1683 },
+  { weekStart: '2026-06-01', startId: 1401, endId: 1456 },
+  { weekStart: '2026-06-08', startId: 1457, endId: 1512 },
+  { weekStart: '2026-06-15', startId: 1513, endId: 1569 },
+  { weekStart: '2026-06-22', startId: 1570, endId: 1626 },
+  { weekStart: '2026-08-31', startId: 1627, endId: 1683 },
+  { weekStart: '2026-09-07', startId: 1684, endId: 1740 },
+  { weekStart: '2026-09-14', startId: 1741, endId: 1797 },
+  { weekStart: '2026-09-28', startId: 1798, endId: 1854 },
+  { weekStart: '2026-10-05', startId: 1855, endId: 1911 },
+  { weekStart: '2026-10-19', startId: 1912, endId: 1968 },
+  { weekStart: '2026-10-26', startId: 1684, endId: 1740 },
+  { weekStart: '2026-11-02', startId: 1741, endId: 1797 },
+  { weekStart: '2026-11-09', startId: 1798, endId: 1854 },
+  { weekStart: '2026-11-16', startId: 1855, endId: 1911 },
+  { weekStart: '2026-11-24', startId: 1912, endId: 1968 }
 ];
-const DEFAULT_RANGE = 'oct21';
+
+function getNextClassDeadline(weekStart) {
+  const [year, month, day] = weekStart.split('-').map(Number);
+  for (let offset = 1; offset <= 7; offset++) {
+    const date = new Date(Date.UTC(year, month - 1, day + offset));
+    const hour = CLASS_START_HOUR_BY_WEEKDAY[date.getUTCDay()];
+    if (hour !== undefined) {
+      const dateText = date.toISOString().slice(0, 10);
+      return new Date(`${dateText}T${String(hour).padStart(2, '0')}:00:00+09:00`);
+    }
+  }
+  throw new Error('次の授業日を計算できませんでした。');
+}
+
+function getJstDateTimeParts(date) {
+  const values = {};
+  new Intl.DateTimeFormat('ja-JP', {
+    timeZone: JAPAN_TIME_ZONE,
+    month: 'numeric', day: 'numeric', weekday: 'short',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+  }).formatToParts(date).forEach(part => {
+    if (part.type !== 'literal') values[part.type] = part.value;
+  });
+  return values;
+}
+
+function formatJstDeadline(date) {
+  const parts = getJstDateTimeParts(date);
+  return `${parts.month}/${parts.day}（${parts.weekday}）${parts.hour}:${parts.minute}`;
+}
+
+const RANGE_OPTIONS = ENGLISH_COMMUNICATION_III_TESTS.map((entry, index) => {
+  const deadline = getNextClassDeadline(entry.weekStart);
+  const monthDay = entry.weekStart.slice(5).replace('-', '/');
+  return {
+    key: `ec3_2026_${entry.weekStart.slice(5).replace('-', '_')}`,
+    label: `第${index + 1}回（${monthDay}週）`,
+    sub: `DB3300 ${entry.startId}〜${entry.endId} ｜ 期限 ${formatJstDeadline(deadline)}`,
+    weekStart: entry.weekStart,
+    startId: entry.startId,
+    endId: entry.endId,
+    deadline,
+    testDate: deadline.toISOString(),
+    blob: ['a', 'b', 'd', 'f'][index % 4],
+    tone: ['pink', 'yellow', 'mint', 'blue'][index % 4]
+  };
+});
+
+function getRangeDeadline(option) {
+  return option && option.deadline instanceof Date ? option.deadline : null;
+}
+
+function getNearestFutureRangeKey(now = new Date()) {
+  const upcoming = RANGE_OPTIONS.find(option => {
+    const deadline = getRangeDeadline(option);
+    return deadline && deadline.getTime() > now.getTime();
+  });
+  return (upcoming || RANGE_OPTIONS[RANGE_OPTIONS.length - 1]).key;
+}
+
+const DEFAULT_RANGE = getNearestFutureRangeKey();
+
 function getSavedRange() {
   try {
-    const v = localStorage.getItem('tango_selected_range');
-    // 旧バージョンでは一学期期末が初期値だったため、初回だけ2学期中間へ移行。
-    // 移行後にユーザーが選んだ範囲は、次回以降もそのまま保持する。
-    const migrationKey = 'tango_default_range_migrated_v3';
-    if (!localStorage.getItem(migrationKey)) {
-      // 10/21小テスト範囲を新しい初期範囲に設定。初回移行時のみ既存の選択を更新する。
-      localStorage.setItem('tango_selected_range', DEFAULT_RANGE);
-      localStorage.setItem(migrationKey, '1');
-      return DEFAULT_RANGE;
-    }
-    if (RANGE_OPTIONS.some(o => o.key === v)) return v;
-  } catch (e) {}
-  return DEFAULT_RANGE;
+    const saved = localStorage.getItem(RANGE_SELECTION_KEY);
+    const isManual = localStorage.getItem(RANGE_MANUAL_SELECTION_KEY) === '1';
+    if (isManual && RANGE_OPTIONS.some(option => option.key === saved)) return saved;
+
+    const suggested = getNearestFutureRangeKey();
+    localStorage.setItem(RANGE_SELECTION_KEY, suggested);
+    localStorage.removeItem(RANGE_MANUAL_SELECTION_KEY);
+    return suggested;
+  } catch (e) {
+    return DEFAULT_RANGE;
+  }
 }
+
 function openRangeModal() {
   const box = document.getElementById('range-options');
-  box.innerHTML = RANGE_OPTIONS.map(o => {
-    const on = o.key === activeRange;
-    return `<button class="range-opt tone-${o.tone}${on ? ' selected' : ''}" aria-pressed="${on}" onclick="selectRange('${o.key}')">` +
-      `<svg class="blob ro-blob" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-${o.blob}"/></svg>` +
-      `<span class="ro-text"><b>${o.label}</b><small>${o.sub}</small></span>` +
-      (on ? '<span class="chip chip-ink">選択中</span>' : '') + `</button>`;
-  }).join('');
+  if (!box) return;
+  const now = new Date();
+  const suggested = getNearestFutureRangeKey(now);
+  const isManual = (() => {
+    try { return localStorage.getItem(RANGE_MANUAL_SELECTION_KEY) === '1'; } catch (e) { return false; }
+  })();
+  const helper = isManual
+    ? '手動で選んだ範囲を表示中です。'
+    : `期限が最も近い範囲（${RANGE_OPTIONS.find(option => option.key === suggested).label}）を自動選択中です。`;
+  box.innerHTML = `<p class="range-auto-note">${helper}</p>` + RANGE_OPTIONS.map(option => {
+    const selected = option.key === activeRange;
+    const past = getRangeDeadline(option).getTime() <= now.getTime();
+    return `<button class="range-opt tone-${option.tone}${selected ? ' selected' : ''}${past ? ' is-past' : ''}" aria-pressed="${selected}" onclick="selectRange('${option.key}')">` +
+      `<svg class="blob ro-blob" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-${option.blob}"/></svg>` +
+      `<span class="ro-text"><b>${option.label}</b><small>${option.sub}</small></span>` +
+      (selected ? '<span class="chip chip-ink">選択中</span>' : '') + `</button>`;
+  }).join('') + `<button class="ghost-pill is-wide" type="button" onclick="selectNearestRange()">一番近いテストに自動で戻す</button>`;
   document.getElementById('range-modal').classList.add('open');
 }
+
 function selectRange(key) {
-  try { localStorage.setItem('tango_selected_range', key); } catch (e) {}
-  window.location.reload(); // 範囲ごとに進捗・ランキングが変わるので、読み込み直して切り替える
+  if (!RANGE_OPTIONS.some(option => option.key === key)) return;
+  try {
+    localStorage.setItem(RANGE_SELECTION_KEY, key);
+    localStorage.setItem(RANGE_MANUAL_SELECTION_KEY, '1');
+  } catch (e) {}
+  window.location.reload();
 }
+
+function selectNearestRange() {
+  try {
+    localStorage.setItem(RANGE_SELECTION_KEY, getNearestFutureRangeKey());
+    localStorage.removeItem(RANGE_MANUAL_SELECTION_KEY);
+  } catch (e) {}
+  window.location.reload();
+}
+
 function updateRangeButton() {
-  const o = RANGE_OPTIONS.find(x => x.key === activeRange);
-  const rn = o ? o.label : '';
-  const pill = document.getElementById('range-pill-name'); if (pill) pill.textContent = rn || 'テスト範囲を選ぶ';
-  const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `${rn} 進捗トップ3`;
-  const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `${rn} 進捗ランキング`;
-  // re特訓カードは2学期中間モードのときだけ表示
+  const option = RANGE_OPTIONS.find(item => item.key === activeRange);
+  const name = option ? option.label : '';
+  const pill = document.getElementById('range-pill-name'); if (pill) pill.textContent = name || 'テスト範囲を選ぶ';
+  const t3 = document.getElementById('leaderboard-top3-title'); if (t3) t3.textContent = `${name} 進捗トップ3`;
+  const lt = document.getElementById('leaderboard-modal-title'); if (lt) lt.textContent = `${name} 進捗ランキング`;
   const reCard = document.getElementById('practice-re-card');
-  if (reCard) reCard.style.display = activeRange === 't2mid' ? 'block' : 'none';
+  if (reCard) reCard.style.display = 'none';
 }
 
 function startReWordPractice() {
@@ -628,6 +731,8 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 .ro-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ro-text b { font-size: 16px; font-weight: 900; line-height: 1.35; }
 .ro-text small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.range-opt.is-past .ro-text { opacity: .42; }
+.range-auto-note { margin: 2px 0 2px; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .testdate-list { display: flex; flex-direction: column; gap: 10px; }
 .testdate-list .big-btn { margin: 0; }
 
@@ -956,7 +1061,7 @@ window.__tangoInitialWatchdog = setTimeout(() => {
   <div class="modal-overlay" id="range-modal">
     <div class="modal-box">
       <div class="modal-title">テスト範囲を選ぶ</div>
-      <p class="modal-sub" style="margin-bottom:0;">範囲ごとに進捗・ランキングが別々に記録されます</p>
+      <p class="modal-sub" style="margin-bottom:0;">手動で選んだ範囲は保持されます。未選択時は期限が最も近いテストを自動表示します。</p>
       <div id="range-options"></div>
       <div class="modal-btns">
         <button class="big-btn btn-secondary" style="grid-column: span 2;" onclick="document.getElementById('range-modal').classList.remove('open')">閉じる</button>
@@ -1384,7 +1489,7 @@ function startTangoAuthListener() {
 
       // 選択中の範囲に固有のテスト日があれば共通設定より優先
       const rangeOpt = RANGE_OPTIONS.find(o => o.key === activeRange);
-      if (rangeOpt && rangeOpt.testDate) testDate = new Date(rangeOpt.testDate);
+      if (rangeOpt) testDate = getRangeDeadline(rangeOpt);
 
       const userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.textContent = `${currentNickname || user.displayName || user.email}`;
@@ -2327,17 +2432,14 @@ function loginWithGoogle() {
 // ==========================================
 
 function getActiveRangeInfo() {
-  if (activeRange === 'midterm') return { lo: 0, hi: 140, total: 141, name: "中間範囲" };
-  if (activeRange === 'final') return { lo: 141, hi: 282, total: 142, name: "期末範囲" };
-  if (activeRange === 'extra') return { lo: 283, hi: 618, total: 336, name: "休み明け範囲" };
-  if (activeRange === 'oct21') {
-    const lo = ALL_WORDS.findIndex(w => Number(w.id) === 1912);
-    const last = ALL_WORDS.findIndex(w => Number(w.id) === 1968);
-    if (lo >= 0 && last >= lo) return { lo, hi: last, total: last - lo + 1, name: "10/21 小テスト（DB3300 1912〜1968）" };
-    return { lo: 0, hi: -1, total: 0, name: "10/21 小テスト（単語データ未取得）" };
-  }
-  if (activeRange === 't2mid') { const n = (window.SENTENCES_T2MID || []).length; return { lo: T2MID_LO, hi: T2MID_LO + n - 1, total: n, name: "2学期中間範囲(文章題)" }; }
-  return { lo: 0, hi: 0, total: 0, name: "" };
+  const option = RANGE_OPTIONS.find(item => item.key === activeRange);
+  if (!option) return { lo: 0, hi: -1, total: 0, name: '' };
+
+  const lo = ALL_WORDS.findIndex(word => Number(word.id) === option.startId);
+  const hi = ALL_WORDS.findIndex(word => Number(word.id) === option.endId);
+  const name = `英語コミュニケーションⅢ ${option.label}（DB3300 ${option.startId}〜${option.endId}）`;
+  if (lo >= 0 && hi >= lo) return { lo, hi, total: hi - lo + 1, name };
+  return { lo: 0, hi: -1, total: 0, name: `${name}（単語データ未取得）` };
 }
 
 // ☁️ Firebaseから単語を読み込むだけの超スッキリ版！
@@ -3111,7 +3213,7 @@ function tickCountdown() {
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
 
-  labelEl.textContent = `${info.name}まで（${testDate.getMonth()+1}/${testDate.getDate()} ${pad(testDate.getHours())}:${pad(testDate.getMinutes())}）`;
+  labelEl.textContent = `${info.name}まで（${formatJstDeadline(testDate)}）`;
   if (daysWrap) daysWrap.style.display = days > 0 ? 'flex' : 'none';
   daysEl.textContent = days;
   hmsEl.textContent = `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
@@ -3305,7 +3407,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.4 (模範解答表示・書き写し機能追加)"; 
+const APP_VERSION = "v5.5 (英語コミュニケーションⅢ・2026単語テスト予定)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
