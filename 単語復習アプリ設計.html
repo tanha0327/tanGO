@@ -1058,17 +1058,19 @@ window.__tangoInitialWatchdog = setTimeout(() => {
   <div class="modal-overlay" id="random-modal">
     <div class="modal-box">
       <div class="modal-title">難易度を選んでランダム演習</div>
-      <p class="modal-sub">単語ごとに設定した難易度から出題します</p>
+      <p class="modal-sub" id="random-modal-sub">テスト範囲の単語を難易度ごとに選んで出題します</p>
       <div class="option-grid">
         <button type="button" class="opt-btn tone-mint" id="random-difficulty-easy" onclick="selectRandomDifficulty('easy')"><span class="dot"></span>基礎<small>やさしい単語</small></button>
         <button type="button" class="opt-btn tone-blue selected" id="random-difficulty-standard" onclick="selectRandomDifficulty('standard')"><span class="dot"></span>標準<small>普通の単語</small></button>
         <button type="button" class="opt-btn tone-pink" id="random-difficulty-hard" onclick="selectRandomDifficulty('hard')"><span class="dot"></span>挑戦<small>難しい単語</small></button>
       </div>
-      <div class="rand-count">
-        <svg class="blob" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-b"/></svg>
-        <span id="random-n-val">10</span><small>問</small>
+      <div id="random-question-count-control">
+        <div class="rand-count">
+          <svg class="blob" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-b"/></svg>
+          <span id="random-n-val">10</span><small>問</small>
+        </div>
+        <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="10" aria-label="出題数" oninput="updateRandomSlider()"></div>
       </div>
-      <div class="slider-wrap"><input type="range" id="random-n-slider" min="1" max="142" value="10" aria-label="出題数" oninput="updateRandomSlider()"></div>
       <div id="random-difficulty-count" class="diff-note"></div>
       <div class="modal-btns">
         <button class="big-btn btn-secondary" onclick="document.getElementById('random-modal').classList.remove('open')">戻る</button>
@@ -2788,10 +2790,12 @@ function selectRandomDifficulty(level) {
   const count = getRandomDifficultyWords(rangeWords).length;
   const slider = document.getElementById('random-n-slider');
   slider.max = Math.max(1, count);
-  if (parseInt(slider.value) > count) slider.value = Math.max(1, count);
-  if (count === 0) slider.value = 1;
+  // 難易度を切り替えるたび、問題数は必ず先頭（最小）の値へ戻す。
+  slider.value = slider.min || '1';
   document.getElementById('random-n-val').textContent = slider.value; updateRandomSlider();
   const label = document.getElementById('random-difficulty-count');
+  const countControl = document.getElementById('random-question-count-control');
+  if (countControl) countControl.hidden = complete && !allDone;
   if (!pool.length) label.textContent = 'この範囲ではまだこの難易度に分類された単語がありません。';
   else if (complete && !allDone) label.textContent = `このレベルの${progress.round}周目は完了！他のレベルも一周するまで次の周回には進めません。`;
   else if (complete && allDone) label.textContent = `🎉 3レベルの${progress.round}周目が完了！次は${progress.round + 1}周目：${pool.length}語から出題できます。`;
@@ -2801,6 +2805,9 @@ function selectRandomDifficulty(level) {
 }
 
 function openRandomModal() {
+  const option = RANGE_OPTIONS.find(item => item.key === activeRange);
+  const sub = document.getElementById('random-modal-sub');
+  if (sub) sub.textContent = (option ? option.label : 'テスト範囲') + 'の単語を難易度ごとに選んで出題します';
   selectRandomDifficulty(randomDifficulty);
   document.getElementById('random-modal').classList.add('open');
 }
@@ -3497,7 +3504,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.9 (ランダム演習におすすめ表示)"; 
+const APP_VERSION = "v5.10 (難易度別ランダム出題の操作改善)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
