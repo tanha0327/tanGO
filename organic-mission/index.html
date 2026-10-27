@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#12110e" />
+    <title>官能基ミッション</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Oswald:wght@500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">O</span><span>ORGANIC<br />MISSION</span></div>
+        <div class="top-meta"><span>CLASSIFIED / CHEMISTRY</span><span class="pulse"></span><span>第214区画</span></div>
+      </header>
+
+      <section id="briefing" class="screen active">
+        <p class="eyebrow">MISSION BRIEFING 01</p>
+        <h1>官能基を<span>特定せよ。</span></h1>
+        <p class="lead">構造・分類・一般式をつなぎ、情報を回収する。<br />教科書の表だけを出典にした試作版。</p>
+        <div class="data-strip"><span>対象データ</span><strong>9 官能基</strong><span>出題形式</span><strong>線結び / 穴埋め</strong></div>
+        <div class="mode-grid">
+          <button class="mode-card" data-mode="match"><span class="card-no">01</span><span class="card-title">線結び</span><span>構造と化合物の分類を対応させる</span><i>→</i></button>
+          <button class="mode-card" data-mode="blank"><span class="card-no">02</span><span class="card-title">穴埋め</span><span>一般式・構造から答えを導く</span><i>→</i></button>
+        </div>
+        <p class="note">※ VIVANTを直接再現せず、機密文書・地図・砂漠色の緊張感を独自に解釈しています。</p>
+      </section>
+
+      <section id="match" class="screen">
+        <div class="mission-head"><div><p class="eyebrow">MISSION 01 / LINK ANALYSIS</p><h2>正しい組を<span>照合せよ。</span></h2></div><div class="score">確保済み <b id="match-score">0</b> / 5</div></div>
+        <p class="instruction">左の「官能基の構造」を選び、対応する右の「化合物の分類」を選んでください。</p>
+        <div class="link-board"><div class="column"><p class="column-label">FUNCTIONAL GROUP</p><div id="structure-list" class="choice-list"></div></div><div class="connection"><span>SELECT</span><b>↔</b><span>LINK</span></div><div class="column"><p class="column-label">CLASSIFICATION</p><div id="category-list" class="choice-list"></div></div></div>
+        <div class="actions"><button class="ghost" data-back>← 任務一覧へ</button><button class="primary" id="next-match">次の照合 →</button></div>
+      </section>
+
+      <section id="blank" class="screen">
+        <div class="mission-head"><div><p class="eyebrow">MISSION 02 / CODE BREAKING</p><h2>空欄を<span>埋めよ。</span></h2></div><div class="score">正答 <b id="blank-score">0</b> / 5</div></div>
+        <div id="question-card" class="question-card"></div>
+        <div id="answer-options" class="answer-options"></div>
+        <p id="feedback" class="feedback"></p>
+        <div class="actions"><button class="ghost" data-back>← 任務一覧へ</button><button class="primary" id="next-blank">次の問題 →</button></div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
