@@ -1,0 +1,36 @@
+name: Staging checks
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [main]
+    paths:
+      - "organic-mission/**"
+      - ".github/workflows/staging.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate chemistry prototype
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check app script and required files
+        run: |
+          node --check organic-mission/app.js
+          test -f organic-mission/index.html
+          test -f organic-mission/styles.css
+      - name: Save preview files
+        uses: actions/upload-artifact@v4
+        with:
+          name: organic-mission-staging
+          path: organic-mission/
+          if-no-files-found: error
