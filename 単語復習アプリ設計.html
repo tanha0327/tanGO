@@ -225,7 +225,7 @@ const ENGLISH_COMMUNICATION_III_TESTS = [
   { weekStart: '2026-10-05', startId: 1855, endId: 1911 },
   { weekStart: '2026-10-19', startId: 1912, endId: 1968 },
   { weekStart: '2026-10-26', startId: 1684, endId: 1740 },
-  { weekStart: '2026-11-02', startId: 1741, endId: 1797 },
+  { weekStart: '2026-11-02', startId: 1741, endId: 1797, deadline: '2026-11-04T12:00:00+09:00' },
   { weekStart: '2026-11-09', startId: 1798, endId: 1854 },
   { weekStart: '2026-11-16', startId: 1855, endId: 1911 },
   { weekStart: '2026-11-24', startId: 1912, endId: 1968 }
@@ -262,7 +262,7 @@ function formatJstDeadline(date) {
 }
 
 const SCHEDULE_RANGE_OPTIONS = ENGLISH_COMMUNICATION_III_TESTS.map((entry, index) => {
-  const deadline = getNextClassDeadline(entry.weekStart);
+  const deadline = entry.deadline ? new Date(entry.deadline) : getNextClassDeadline(entry.weekStart);
   const monthDay = entry.weekStart.slice(5).replace('-', '/');
   return {
     key: `ec3_2026_${entry.weekStart.slice(5).replace('-', '_')}`,
@@ -1933,11 +1933,11 @@ function startQuestionTimer() {
 function renderQuestion() {
   stopQuestionTimer(); questionAnswered = false; mustRetypeCurrentWord = false;
   const w = state.queue[state.current].word;
+  const initial = String(w.en || '').trim().charAt(0);
   document.getElementById('quiz-counter').textContent = `${state.current+1} / ${state.queue.length}`;
   document.getElementById('quiz-progress').style.width = ((state.current / state.queue.length) * 100) + '%';
   if (w.sentence) {
     // 📝 文章題：空所に入る単語の最初の1文字をヒントとして表示
-    const initial = String(w.en || '').trim().charAt(0);
     const sentenceHtml = escHtml(w.sentence).replace(/\(\s*____\s*\)/g, '<span class="blank"><b>' + escHtml(initial) + '</b></span>');
     document.getElementById('quiz-word').innerHTML =
       `<div class="q-sent">${sentenceHtml}</div><div class="q-jp">${escHtml(w.sentenceJp || '')}</div>`;
@@ -1946,20 +1946,21 @@ function renderQuestion() {
   } else {
     document.getElementById('quiz-word').textContent = w.jp;
     document.getElementById('quiz-hint').innerHTML =
-      `<span class="chip chip-yellow">No.${escHtml(w.id)}</span><span class="chip">英語で答えてください</span>`;
+      `<span class="chip chip-yellow">No.${escHtml(w.id)}</span><span class="chip">英語で答えてください（頭文字 ${escHtml(initial)}）</span>`;
   }
-  document.getElementById('quiz-answer').value = '';
-  document.getElementById('quiz-answer').placeholder = '解答を入力';
-  document.getElementById('quiz-answer').disabled = false;
+  const answerInput = document.getElementById('quiz-answer');
+  answerInput.value = initial;
+  answerInput.placeholder = initial ? '続きのスペルを入力' : '解答を入力';
+  answerInput.disabled = false;
   document.getElementById('quiz-result').style.display = 'none';
   document.getElementById('btn-submit').style.display = 'block';
   document.getElementById('quiz-tap-hint').textContent = '20秒以内に回答。Enterキーで回答し、答えが出た後はEnterキーで次へ進みます。';
   // 問題ごとに入力欄へフォーカス。iPhoneでキーボードが出た際、
   // preventScroll:true によって画面が固定される問題を避け、入力欄を見える位置へ移動する。
-  const answerInput = document.getElementById('quiz-answer');
   requestAnimationFrame(() => {
     if (!questionAnswered && document.getElementById('screen-quiz').classList.contains('visible')) {
       answerInput.focus();
+      answerInput.setSelectionRange(answerInput.value.length, answerInput.value.length);
       // iOSはキーボード表示後にビューポートの高さが変わるため、少し待ってから再調整する。
       setTimeout(() => {
         if (!questionAnswered && document.activeElement === answerInput &&
@@ -3504,7 +3505,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.10 (難易度別ランダム出題の操作改善)"; 
+const APP_VERSION = "v5.11 (先頭文字ヒント・11/4期限対応)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
