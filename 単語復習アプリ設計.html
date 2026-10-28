@@ -832,24 +832,40 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (max-width: 360px) { .word-admin-difficulty-btn { font-size: 10px; padding: 8px 1px; } }
 
 /* ---------- initial sync overlay ---------- */
-#sync-loading { position: fixed; inset: 0; z-index: 20000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; background: var(--page); color: var(--ink); text-align: center; transition: opacity .2s ease, visibility .2s ease; overflow: hidden; }
+#sync-loading { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--page); color: var(--ink); transition: opacity .28s ease, visibility .28s ease; overflow: hidden; }
 #sync-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-#sync-loading > .blob { position: absolute; z-index: 0; }
-#sync-loading > .blob.sl1 { width: 260px; left: -90px; top: -60px; color: var(--yellow); }
-#sync-loading > .blob.sl2 { width: 190px; right: -70px; bottom: -40px; color: var(--pink); }
-#sync-loading > .blob.sl3 { width: 90px; right: 18%; top: 14%; color: var(--blue); }
-#sync-loading > .blob.sl4 { width: 70px; left: 12%; bottom: 16%; color: var(--mint); }
-#sync-loading > :not(.blob) { position: relative; z-index: 1; }
-.sync-spinner { width: 46px; height: 46px; border: 4px solid var(--soft); border-top-color: var(--ink); border-radius: 50%; animation: sync-spin .75s linear infinite; }
-#sync-loading-title { font-size: 18px; font-weight: 900; }
-#sync-loading-percent { font-size: 44px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.sync-track { width: min(320px, 85vw); height: 14px; border-radius: 99px; background: var(--soft); box-shadow: inset 0 0 0 1.5px var(--ink); overflow: hidden; }
-#sync-loading-bar { height: 100%; width: 0%; border-radius: 99px; background: var(--yellow); box-shadow: inset 0 0 0 1.5px var(--ink); transition: width .25s ease; }
-#sync-loading-stage { padding: 4px 14px; border-radius: 999px; background: var(--card); font-size: 13px; font-weight: 700; }
-#sync-loading-message { max-width: 320px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-#sync-retry-btn { display: none; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--btn-bg); color: var(--btn-fg); font-size: 14px; font-weight: 700; }
-@keyframes sync-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .sync-spinner { animation-duration: 1.8s; } }
+.sync-loading-shell { width: min(390px, 100%); display: grid; gap: 16px; }
+.sync-loading-brand { display: inline-flex; align-items: center; justify-self: center; font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
+.sync-loading-brand b { margin-left: 3px; padding: 1px 9px 2px; border-radius: 12px 16px 12px 16px; background: var(--yellow); color: #111; }
+.sync-loading-kicker { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .02em; text-align: center; }
+.sync-skeleton-preview { display: grid; gap: 14px; padding: 18px; border: 1.5px solid var(--line-2); border-radius: 25px; background: var(--card); box-shadow: 0 18px 42px rgba(23, 27, 35, .09); }
+.sync-skeleton-top { display: flex; align-items: center; gap: 10px; }
+.sync-skeleton-block { position: relative; display: block; overflow: hidden; border-radius: 999px; background: var(--soft); }
+.sync-skeleton-block::after { content: ""; position: absolute; inset: 0; transform: translateX(-110%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent); animation: sync-shimmer 1.45s ease-in-out infinite; }
+.sync-skeleton-avatar { width: 36px; height: 36px; flex: none; border-radius: 50%; }
+.sync-skeleton-headlines { display: grid; gap: 6px; flex: 1; }
+.sync-skeleton-line { height: 10px; }
+.sync-skeleton-line.short { width: 46%; }
+.sync-skeleton-line.medium { width: 68%; }
+.sync-skeleton-hero { display: grid; align-content: space-between; min-height: 130px; padding: 17px; border-radius: 18px; background: var(--soft); }
+.sync-skeleton-hero .sync-skeleton-line { background: rgba(35,39,47,.12); }
+.sync-skeleton-hero .sync-skeleton-line::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent); }
+.sync-skeleton-number { width: 40%; height: 32px; border-radius: 9px; }
+.sync-skeleton-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sync-skeleton-tile { height: 62px; border-radius: 15px; }
+.sync-skeleton-tile:nth-child(2) .sync-skeleton-block::after { animation-delay: .18s; }
+.sync-skeleton-status { display: grid; gap: 10px; padding: 2px 2px 0; }
+.sync-loading-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+#sync-loading-title { font-size: 16px; font-weight: 900; line-height: 1.35; }
+#sync-loading-percent { flex: none; font-size: 25px; font-weight: 900; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.sync-track { height: 10px; border-radius: 99px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line-2); overflow: hidden; }
+#sync-loading-bar { height: 100%; width: 0%; border-radius: inherit; background: var(--yellow); transition: width .25s ease; }
+.sync-loading-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+#sync-loading-stage { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sync-loading-message { color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
+#sync-retry-btn { display: none; justify-self: center; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--btn-bg); color: var(--btn-fg); font-size: 14px; font-weight: 700; }
+@keyframes sync-shimmer { 100% { transform: translateX(110%); } }
+@media (prefers-reduced-motion: reduce) { .sync-skeleton-block::after { animation-duration: 2.8s; } }
 
 /* ---------- intro (Lottie) ---------- */
 #transition-screen { position: fixed; inset: 0; z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; background: var(--page); }
@@ -946,20 +962,46 @@ html.dark-mode #lottie-container { filter: invert(1) hue-rotate(180deg); }
 </div>
 
 <!-- 初期同期中は日付や仮の進捗を見せず、同期完了後にホームを表示 -->
-<div id="sync-loading" role="status" aria-live="polite">
-  <svg class="blob sl1" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-b"/></svg>
-  <svg class="blob sl2" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-c"/></svg>
-  <svg class="blob sl3" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-a"/></svg>
-  <svg class="blob sl4" viewBox="0 0 200 200" aria-hidden="true" focusable="false"><use href="#blob-d"/></svg>
-  <div class="sync-spinner" aria-hidden="true"></div>
-  <div id="sync-loading-title">学習データを準備しています</div>
-  <div id="sync-loading-percent">0%</div>
-  <div class="sync-track" role="progressbar" aria-label="学習データの準備状況" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="sync-loading-progress">
-    <div id="sync-loading-bar" style="width:0%;"></div>
+<div id="sync-loading" role="status" aria-live="polite" aria-busy="true">
+  <div class="sync-loading-shell">
+    <div class="sync-loading-brand" aria-hidden="true">tan<b>GO</b></div>
+    <div class="sync-loading-kicker">あなたの学習画面を準備中</div>
+
+    <div class="sync-skeleton-preview" aria-hidden="true">
+      <div class="sync-skeleton-top">
+        <span class="sync-skeleton-block sync-skeleton-avatar"></span>
+        <div class="sync-skeleton-headlines">
+          <span class="sync-skeleton-block sync-skeleton-line medium"></span>
+          <span class="sync-skeleton-block sync-skeleton-line short"></span>
+        </div>
+      </div>
+      <div class="sync-skeleton-hero">
+        <span class="sync-skeleton-block sync-skeleton-line short"></span>
+        <span class="sync-skeleton-block sync-skeleton-number"></span>
+        <span class="sync-skeleton-block sync-skeleton-line medium"></span>
+      </div>
+      <div class="sync-skeleton-row">
+        <span class="sync-skeleton-block sync-skeleton-tile"></span>
+        <span class="sync-skeleton-block sync-skeleton-tile"></span>
+      </div>
+    </div>
+
+    <div class="sync-loading-status">
+      <div class="sync-loading-heading">
+        <div id="sync-loading-title">学習データを準備しています</div>
+        <div id="sync-loading-percent">0%</div>
+      </div>
+      <div class="sync-track" role="progressbar" aria-label="学習データの準備状況" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="sync-loading-progress">
+        <div id="sync-loading-bar" style="width:0%;"></div>
+      </div>
+      <div class="sync-loading-meta">
+        <div id="sync-loading-stage">起動準備中</div>
+        <span>もうすぐです</span>
+      </div>
+      <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
+      <button id="sync-retry-btn" onclick="window.location.reload()">再読み込みして再試行</button>
+    </div>
   </div>
-  <div id="sync-loading-stage">起動準備中</div>
-  <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
-  <button id="sync-retry-btn" onclick="window.location.reload()">再読み込みして再試行</button>
 </div>
 
 <script>
@@ -3505,7 +3547,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.11 (先頭文字ヒント・11/4期限対応)"; 
+const APP_VERSION = "v5.12 (スケルトンローディング画面)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
