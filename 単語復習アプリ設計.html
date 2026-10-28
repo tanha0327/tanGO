@@ -832,29 +832,38 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 @media (max-width: 360px) { .word-admin-difficulty-btn { font-size: 10px; padding: 8px 1px; } }
 
 /* ---------- initial sync overlay ---------- */
-#sync-loading { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--page); color: var(--ink); transition: opacity .28s ease, visibility .28s ease; overflow: hidden; }
+#sync-loading { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--page); color: var(--ink); transition: opacity .28s ease, visibility .28s ease; overflow: auto; }
 #sync-loading.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.sync-loading-shell { width: min(390px, 100%); display: grid; gap: 16px; }
+.sync-loading-shell { width: min(390px, 100%); display: grid; gap: 16px; margin: auto; }
 .sync-loading-brand { display: inline-flex; align-items: center; justify-self: center; font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1; }
 .sync-loading-brand b { margin-left: 3px; padding: 1px 9px 2px; border-radius: 12px 16px 12px 16px; background: var(--yellow); color: #111; }
 .sync-loading-kicker { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .02em; text-align: center; }
-.sync-skeleton-preview { display: grid; gap: 14px; padding: 18px; border: 1.5px solid var(--line-2); border-radius: 25px; background: var(--card); box-shadow: 0 18px 42px rgba(23, 27, 35, .09); }
-.sync-skeleton-top { display: flex; align-items: center; gap: 10px; }
+.sync-live-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sync-live-card { position: relative; min-height: 108px; overflow: hidden; border: 1.5px solid var(--line-2); border-radius: 18px; background: var(--card); box-shadow: 0 10px 24px rgba(23, 27, 35, .06); }
+.sync-live-card-wide { grid-column: 1 / -1; min-height: 96px; }
+.sync-card-skeleton, .sync-card-ready { position: absolute; inset: 0; padding: 15px; transition: opacity .28s ease, transform .28s ease, visibility .28s ease; }
+.sync-card-skeleton { display: grid; align-content: center; gap: 9px; opacity: 1; visibility: visible; }
+.sync-card-ready { display: flex; flex-direction: column; justify-content: center; gap: 5px; opacity: 0; visibility: hidden; transform: translateY(5px); }
+.sync-live-card.is-ready .sync-card-skeleton { opacity: 0; visibility: hidden; transform: translateY(-4px); }
+.sync-live-card.is-ready .sync-card-ready { opacity: 1; visibility: visible; transform: none; }
+.sync-skeleton-row { display: flex; align-items: center; gap: 9px; }
 .sync-skeleton-block { position: relative; display: block; overflow: hidden; border-radius: 999px; background: var(--soft); }
 .sync-skeleton-block::after { content: ""; position: absolute; inset: 0; transform: translateX(-110%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent); animation: sync-shimmer 1.45s ease-in-out infinite; }
-.sync-skeleton-avatar { width: 36px; height: 36px; flex: none; border-radius: 50%; }
-.sync-skeleton-headlines { display: grid; gap: 6px; flex: 1; }
-.sync-skeleton-line { height: 10px; }
-.sync-skeleton-line.short { width: 46%; }
+.sync-skeleton-avatar { width: 30px; height: 30px; flex: none; border-radius: 50%; }
+.sync-skeleton-lines { display: grid; gap: 6px; flex: 1; }
+.sync-skeleton-line { height: 9px; }
+.sync-skeleton-line.short { width: 43%; }
 .sync-skeleton-line.medium { width: 68%; }
-.sync-skeleton-hero { display: grid; align-content: space-between; min-height: 130px; padding: 17px; border-radius: 18px; background: var(--soft); }
-.sync-skeleton-hero .sync-skeleton-line { background: rgba(35,39,47,.12); }
-.sync-skeleton-hero .sync-skeleton-line::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent); }
-.sync-skeleton-number { width: 40%; height: 32px; border-radius: 9px; }
-.sync-skeleton-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sync-skeleton-tile { height: 62px; border-radius: 15px; }
-.sync-skeleton-tile:nth-child(2) .sync-skeleton-block::after { animation-delay: .18s; }
-.sync-skeleton-status { display: grid; gap: 10px; padding: 2px 2px 0; }
+.sync-skeleton-line.long { width: 88%; }
+.sync-skeleton-number { width: 38%; height: 28px; border-radius: 8px; }
+.sync-live-card[data-sync-task="user"] .sync-skeleton-block::after { animation-delay: .12s; }
+.sync-live-card[data-sync-task="vocabulary"] .sync-skeleton-block::after { animation-delay: .24s; }
+.sync-live-card[data-sync-task="sentences"] .sync-skeleton-block::after { animation-delay: .36s; }
+.sync-card-icon { display: grid; place-items: center; width: 26px; height: 26px; margin-bottom: 2px; border-radius: 50%; background: var(--yellow); color: var(--ink); font-size: 15px; font-weight: 900; }
+.sync-card-eyebrow { color: var(--muted); font-size: 11px; font-weight: 700; }
+.sync-card-title { overflow: hidden; font-size: 15px; font-weight: 900; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.sync-card-detail { overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.sync-loading-status { display: grid; gap: 10px; padding: 3px 2px 0; }
 .sync-loading-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 #sync-loading-title { font-size: 16px; font-weight: 900; line-height: 1.35; }
 #sync-loading-percent { flex: none; font-size: 25px; font-weight: 900; letter-spacing: -.04em; font-variant-numeric: tabular-nums; line-height: 1; }
@@ -865,6 +874,7 @@ html.dark-mode .icon-btn { background-image: url("data:image/svg+xml,%3Csvg xmln
 #sync-loading-message { color: var(--muted); font-size: 12px; line-height: 1.6; text-align: center; }
 #sync-retry-btn { display: none; justify-self: center; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--btn-bg); color: var(--btn-fg); font-size: 14px; font-weight: 700; }
 @keyframes sync-shimmer { 100% { transform: translateX(110%); } }
+@media (max-height: 650px) { #sync-loading { align-items: flex-start; } .sync-loading-shell { margin: 18px auto; } .sync-live-card { min-height: 92px; } }
 @media (prefers-reduced-motion: reduce) { .sync-skeleton-block::after { animation-duration: 2.8s; } }
 
 /* ---------- intro (Lottie) ---------- */
@@ -965,39 +975,50 @@ html.dark-mode #lottie-container { filter: invert(1) hue-rotate(180deg); }
 <div id="sync-loading" role="status" aria-live="polite" aria-busy="true">
   <div class="sync-loading-shell">
     <div class="sync-loading-brand" aria-hidden="true">tan<b>GO</b></div>
-    <div class="sync-loading-kicker">あなたの学習画面を準備中</div>
+    <div class="sync-loading-kicker">準備できた内容から先に表示します</div>
 
-    <div class="sync-skeleton-preview" aria-hidden="true">
-      <div class="sync-skeleton-top">
-        <span class="sync-skeleton-block sync-skeleton-avatar"></span>
-        <div class="sync-skeleton-headlines">
-          <span class="sync-skeleton-block sync-skeleton-line medium"></span>
-          <span class="sync-skeleton-block sync-skeleton-line short"></span>
+    <div class="sync-live-grid" aria-label="読み込み状況">
+      <section class="sync-live-card sync-live-card-wide" data-sync-task="target">
+        <div class="sync-card-skeleton" aria-hidden="true">
+          <div class="sync-skeleton-row">
+            <span class="sync-skeleton-block sync-skeleton-avatar"></span>
+            <div class="sync-skeleton-lines"><span class="sync-skeleton-block sync-skeleton-line medium"></span><span class="sync-skeleton-block sync-skeleton-line short"></span></div>
+          </div>
+          <span class="sync-skeleton-block sync-skeleton-line long"></span>
         </div>
-      </div>
-      <div class="sync-skeleton-hero">
-        <span class="sync-skeleton-block sync-skeleton-line short"></span>
-        <span class="sync-skeleton-block sync-skeleton-number"></span>
-        <span class="sync-skeleton-block sync-skeleton-line medium"></span>
-      </div>
-      <div class="sync-skeleton-row">
-        <span class="sync-skeleton-block sync-skeleton-tile"></span>
-        <span class="sync-skeleton-block sync-skeleton-tile"></span>
-      </div>
+        <div class="sync-card-ready" aria-hidden="true">
+          <span class="sync-card-icon">✓</span>
+          <span class="sync-card-eyebrow">次のテスト範囲</span>
+          <strong class="sync-card-title" id="sync-ready-range-title">テスト範囲を確認しました</strong>
+          <span class="sync-card-detail" id="sync-ready-range-detail">授業スケジュールを準備しました</span>
+        </div>
+      </section>
+
+      <section class="sync-live-card" data-sync-task="vocabulary">
+        <div class="sync-card-skeleton" aria-hidden="true"><span class="sync-skeleton-block sync-skeleton-line medium"></span><span class="sync-skeleton-block sync-skeleton-number"></span><span class="sync-skeleton-block sync-skeleton-line short"></span></div>
+        <div class="sync-card-ready" aria-hidden="true"><span class="sync-card-icon">✓</span><span class="sync-card-eyebrow">単語帳</span><strong class="sync-card-title" id="sync-ready-vocabulary-title">単語データ</strong><span class="sync-card-detail" id="sync-ready-vocabulary-detail">準備完了</span></div>
+      </section>
+
+      <section class="sync-live-card" data-sync-task="user">
+        <div class="sync-card-skeleton" aria-hidden="true"><span class="sync-skeleton-block sync-skeleton-line medium"></span><span class="sync-skeleton-block sync-skeleton-number"></span><span class="sync-skeleton-block sync-skeleton-line short"></span></div>
+        <div class="sync-card-ready" aria-hidden="true"><span class="sync-card-icon">✓</span><span class="sync-card-eyebrow">あなたの学習</span><strong class="sync-card-title" id="sync-ready-user-title">学習履歴</strong><span class="sync-card-detail" id="sync-ready-user-detail">読み込み完了</span></div>
+      </section>
+
+      <section class="sync-live-card" data-sync-task="sentences">
+        <div class="sync-card-skeleton" aria-hidden="true"><span class="sync-skeleton-block sync-skeleton-line medium"></span><span class="sync-skeleton-block sync-skeleton-line long"></span><span class="sync-skeleton-block sync-skeleton-line short"></span></div>
+        <div class="sync-card-ready" aria-hidden="true"><span class="sync-card-icon">✓</span><span class="sync-card-eyebrow">文章題</span><strong class="sync-card-title" id="sync-ready-sentences-title">文章題データ</strong><span class="sync-card-detail" id="sync-ready-sentences-detail">準備完了</span></div>
+      </section>
+
+      <section class="sync-live-card" data-sync-task="auth">
+        <div class="sync-card-skeleton" aria-hidden="true"><span class="sync-skeleton-block sync-skeleton-line medium"></span><span class="sync-skeleton-block sync-skeleton-line short"></span></div>
+        <div class="sync-card-ready" aria-hidden="true"><span class="sync-card-icon">✓</span><span class="sync-card-eyebrow">アカウント</span><strong class="sync-card-title" id="sync-ready-auth-title">ログイン確認</strong><span class="sync-card-detail" id="sync-ready-auth-detail">完了</span></div>
+      </section>
     </div>
 
     <div class="sync-loading-status">
-      <div class="sync-loading-heading">
-        <div id="sync-loading-title">学習データを準備しています</div>
-        <div id="sync-loading-percent">0%</div>
-      </div>
-      <div class="sync-track" role="progressbar" aria-label="学習データの準備状況" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="sync-loading-progress">
-        <div id="sync-loading-bar" style="width:0%;"></div>
-      </div>
-      <div class="sync-loading-meta">
-        <div id="sync-loading-stage">起動準備中</div>
-        <span>もうすぐです</span>
-      </div>
+      <div class="sync-loading-heading"><div id="sync-loading-title">学習データを準備しています</div><div id="sync-loading-percent">0%</div></div>
+      <div class="sync-track" role="progressbar" aria-label="学習データの準備状況" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="sync-loading-progress"><div id="sync-loading-bar" style="width:0%;"></div></div>
+      <div class="sync-loading-meta"><div id="sync-loading-stage">起動準備中</div><span>もうすぐです</span></div>
       <div id="sync-loading-message">クラウドと同期しています。少しだけお待ちください。</div>
       <button id="sync-retry-btn" onclick="window.location.reload()">再読み込みして再試行</button>
     </div>
@@ -1398,6 +1419,31 @@ function setSyncTaskProgress(task, value, stage, message) {
   window.__tangoSyncPercent = percent;
   updateSyncProgressDisplay(stage, message, percent);
 }
+function updateSyncLoadingPreview() {
+  const tasks = window.__tangoSyncTasks || {};
+  document.querySelectorAll('[data-sync-task]').forEach(card => {
+    const ready = Number(tasks[card.dataset.syncTask] || 0) >= 100;
+    card.classList.toggle('is-ready', ready);
+    const readyContent = card.querySelector('.sync-card-ready');
+    if (readyContent) readyContent.setAttribute('aria-hidden', String(!ready));
+  });
+
+  const range = typeof RANGE_OPTIONS !== 'undefined' && Array.isArray(RANGE_OPTIONS)
+    ? RANGE_OPTIONS.find(option => option.key === activeRange) : null;
+  const rangeTitle = document.getElementById('sync-ready-range-title');
+  const rangeDetail = document.getElementById('sync-ready-range-detail');
+  if (rangeTitle) rangeTitle.textContent = range ? range.label : 'テスト範囲を確認しました';
+  if (rangeDetail) rangeDetail.textContent = range ? range.sub : '授業スケジュールを準備しました';
+
+  const vocabTitle = document.getElementById('sync-ready-vocabulary-title');
+  const vocabDetail = document.getElementById('sync-ready-vocabulary-detail');
+  const wordCount = typeof ALL_WORDS !== 'undefined' && Array.isArray(ALL_WORDS) ? ALL_WORDS.length : 0;
+  if (vocabTitle) vocabTitle.textContent = wordCount ? 'DB3300 ' + wordCount.toLocaleString() + '語' : '単語データ';
+  if (vocabDetail) vocabDetail.textContent = wordCount ? '単語帳を準備しました' : '取得を確認しました';
+
+  const userDetail = document.getElementById('sync-ready-user-detail');
+  if (userDetail) userDetail.textContent = typeof currentNickname !== 'undefined' && currentNickname ? currentNickname + ' さんの履歴を準備しました' : '学習履歴を準備しました';
+}
 function updateSyncProgressDisplay(stage, message, percent) {
   const value = Number(percent == null ? (window.__tangoSyncPercent || 0) : percent);
   const percentEl = document.getElementById('sync-loading-percent');
@@ -1410,7 +1456,9 @@ function updateSyncProgressDisplay(stage, message, percent) {
   if (progressEl) progressEl.setAttribute('aria-valuenow', String(value));
   if (stageEl && stage) stageEl.textContent = stage;
   if (messageEl && message) messageEl.textContent = message;
+  updateSyncLoadingPreview();
 }
+
 function showSyncLoading(title, message) {
   const overlay = document.getElementById('sync-loading');
   const titleEl = document.getElementById('sync-loading-title');
@@ -3547,7 +3595,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.12 (スケルトンローディング画面)"; 
+const APP_VERSION = "v5.13 (段階表示ローディング画面)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
