@@ -225,10 +225,10 @@ const ENGLISH_COMMUNICATION_III_TESTS = [
   { weekStart: '2026-10-05', startId: 1855, endId: 1911 },
   { weekStart: '2026-10-19', startId: 1912, endId: 1968 },
   { weekStart: '2026-10-26', startId: 1684, endId: 1740 },
-  { weekStart: '2026-11-02', startId: 1741, endId: 1797, deadline: '2026-11-04T12:00:00+09:00' },
-  { weekStart: '2026-11-09', startId: 1798, endId: 1854 },
-  { weekStart: '2026-11-16', startId: 1855, endId: 1911 },
-  { weekStart: '2026-11-24', startId: 1912, endId: 1968 }
+  { weekStart: '2026-11-09', startId: 1741, endId: 1797 },
+  { weekStart: '2026-11-16', startId: 1798, endId: 1854 },
+  { weekStart: '2026-11-23', startId: 1855, endId: 1911 },
+  { weekStart: '2026-11-30', startId: 1912, endId: 1968 }
 ];
 
 function getNextClassDeadline(weekStart) {
@@ -3595,7 +3595,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.13 (段階表示ローディング画面)"; 
+const APP_VERSION = "v5.14 (11月テスト日程の繰り下げ)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
