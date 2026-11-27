@@ -282,7 +282,7 @@ const SCHEDULE_RANGE_OPTIONS = ENGLISH_COMMUNICATION_III_TESTS.map((entry, index
 const STANDARD_RANGE_KEY = 't2final';
 const STANDARD_RANGE_VERSION = '2026_t2final_1827_1968';
 const STANDARD_RANGE_OPTIONS = [
-  { key: STANDARD_RANGE_KEY, label: '2学期期末試験', sub: 'DB3300 1827〜1968', startId: 1827, endId: 1968, blob: 'f', tone: 'pink' }
+  { key: STANDARD_RANGE_KEY, label: '2学期期末試験', sub: 'DB3300 1827〜1968 ｜ 期限 12/8（火）1時間目 9:10', startId: 1827, endId: 1968, testDate: '2026-12-08T09:10:00+09:00', blob: 'f', tone: 'pink' }
 ];
 
 const LEGACY_RANGE_OPTIONS = [
@@ -3610,7 +3610,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 
 // 👇 アップデートするたびに、ここの名前を変えると「最新か」一目でわかります！
-const APP_VERSION = "v5.18 (2学期期末範囲を標準化)"; 
+const APP_VERSION = "v5.19 (2学期期末の試験日時設定)"; 
 
 window.addEventListener('DOMContentLoaded', () => {
   const homeScreen = document.getElementById('screen-home');
